@@ -18,7 +18,7 @@ Gameplay rules shared by client and server: movement, combat, weapons, pickups a
 A Duel server has two player slots (the game sets `maxclients 2`). Anyone else who connects joins as a spectator, through the RAVAGE engine's `sv_fullspectate`. A match goes:
 
 1. **Warmup.** Players play freely. Each presses F3 (or types `ready` in the console) when ready, and `notready` takes it back.
-2. **Countdown.** Once both are ready, five seconds in which nobody can fire. It stops if a player leaves or un-readies.
+2. **Countdown.** Once both are ready, five seconds in which nobody can fire. The announcer calls "get ready", three, two, one and "fight!" (the client HUD plays these, in `hud.qc`). It stops if a player leaves or un-readies.
 3. **Play.** Frags, pickups and projectiles reset and both players respawn. The `timelimit` clock (minutes) starts now, and `fraglimit` ends the match early.
 4. **Overtime.** If time runs out with the scores tied, the next frag wins.
 5. **Intermission.** The scoreboard says who won. If a player leaves mid-match, the other wins by forfeit.

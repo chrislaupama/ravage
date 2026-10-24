@@ -13,6 +13,7 @@ Development utilities: asset processing, profiling and build tooling.
 | `assets/iqm.py` | The IQM and PNG writers it uses |
 | `assets/make_sounds.py` | Generates the placeholder out-of-ammo and jump pad sounds |
 | `assets/import_librequake_sounds.py` | Copies the LibreQuake sounds RAVAGE uses (needs a LibreQuake checkout) |
+| `assets/import_announcer.py` | Cuts the announcer's ElevenLabs takes (MP3) into the countdown sounds (needs ffmpeg) |
 | `trenchbroom/RAVAGE/` | TrenchBroom game config, entity definitions and compile profile |
 
 See [docs/mapping.md](../docs/mapping.md).

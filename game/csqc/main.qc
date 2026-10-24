@@ -5,6 +5,7 @@
 void(float apilevel, string enginename, float engineversion) CSQC_Init =
 {
 	View_Init();
+	Hud_Init();
 	registercommand("rv_hudtest", "Print the stats the HUD shows (used by tests/match.sh)");
 	registercommand("rv_framebench", "rv_framebench <frames> [players]: time whole frames while turning the view, optionally among running player models (used by tools/bench-map.sh)");
 };
@@ -31,6 +32,7 @@ void(float vwidth, float vheight, float notmenu) CSQC_UpdateView =
 {
 	View_Draw();
 	Hud_Draw([vwidth, vheight]);
+	Hud_Announcer();
 };
 
 // F3 readies up (or back down) during warmup, like typing "ready".

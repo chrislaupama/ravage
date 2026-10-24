@@ -9,7 +9,7 @@ The near-term goal is a standalone first milestone: a TrenchBroom-built graybox 
 5. **Standalone game and first milestone.** Done. RAVAGE game code (QuakeC) with spawn points, weapon pickups, health, armor and other multiplayer entities. GPL-licensed QuakeWorld movement, combat and weapon logic is kept or adapted where it fits. Original or appropriately licensed placeholder player and weapon models, sounds and textures are added so the game runs standalone. The step ends with an automated test that compiles the arena, loads it on a headless dedicated server, and checks spawn points, pickups, collision and two connected clients.
 
 6. **Player and weapon models.** Done. The player is LibreQuake's model and animations (BSD-3) with a RAVAGE skin. The six weapons are LibreQuake's models and animations, recoloured from wood and brass to steel, ceramic and glowing energy parts. Health, armor, ammo and projectiles are LibreQuake's too, recoloured the same way, and so are nearly all the sounds.
-7. **Duel match flow.** In review. Warmup with ready-up, a countdown, a match clock and live score on the HUD, overtime when time runs out on a tie, forfeits, and a two-player limit with anyone else joining as a spectator. Next for Duel: match recording and post-match statistics.
+7. **Duel match flow.** In review. Warmup with ready-up, a countdown with an announcer, a match clock and live score on the HUD, overtime when time runs out on a tie, forfeits, and a two-player limit with anyone else joining as a spectator. Next for Duel: match recording and post-match statistics.
 
 Rendering benchmarks run in CI with software rendering (see [mapping.md](mapping.md#benchmark)) to catch regressions.
 

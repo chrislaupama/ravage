@@ -166,6 +166,45 @@ void(vector screen) Hud_Match =
 	}
 };
 
+// The announcer: "get ready" as the countdown starts, then three, two,
+// one and "fight!" as the match begins.
+float hud_announced_state;
+float hud_announced_second;
+void() Hud_Announcer =
+{
+	local float state, second;
+
+	state = getstatf(STAT_RV_MATCH_STATE);
+	if (state == MATCH_COUNTDOWN)
+	{
+		second = ceil(getstatf(STAT_RV_MATCH_TIME) - time);
+		if (hud_announced_state != MATCH_COUNTDOWN)
+			localsound("announcer/getready.wav", CHAN_VOICE, 1);
+		else if (second != hud_announced_second)
+		{
+			if (second == 3)
+				localsound("announcer/three.wav", CHAN_VOICE, 1);
+			else if (second == 2)
+				localsound("announcer/two.wav", CHAN_VOICE, 1);
+			else if (second == 1)
+				localsound("announcer/one.wav", CHAN_VOICE, 1);
+		}
+		hud_announced_second = second;
+	}
+	else if (state == MATCH_PLAYING && hud_announced_state == MATCH_COUNTDOWN)
+		localsound("announcer/fight.wav", CHAN_VOICE, 1);
+	hud_announced_state = state;
+};
+
+void() Hud_Init =
+{
+	precache_sound("announcer/getready.wav");
+	precache_sound("announcer/three.wav");
+	precache_sound("announcer/two.wav");
+	precache_sound("announcer/one.wav");
+	precache_sound("announcer/fight.wav");
+};
+
 // Every player and their frags, most first.
 void(vector screen) Hud_Scoreboard =
 {

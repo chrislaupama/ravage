@@ -27,6 +27,10 @@ trap 'rm -f "$cfg"' EXIT
 	i=0; while [ $i -lt 30 ]; do echo wait; i=$((i + 1)); done
 	echo "map $map"
 	i=0; while [ $i -lt 120 ]; do echo wait; i=$((i + 1)); done
+	# The Xvfb window never has focus, and unfocused clients are capped at
+	# cl_idlefps (60). Lift the cap only now: the waits above count frames,
+	# and at an uncapped rate they would pass before the map has loaded.
+	echo "cl_idlefps 0"
 	echo "timerefresh 1 $frames"
 	echo "timerefresh 1 $frames"
 	echo "timerefresh 1 $frames"

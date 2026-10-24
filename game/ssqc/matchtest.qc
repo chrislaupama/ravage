@@ -1,0 +1,203 @@
+/*
+	Two-client match test, used by tests/match.sh.
+
+	Enabled with "set rv_matchtest 1" on the server. Two real clients
+	connect: "target" stands still and "runner" holds +forward. Once both
+	are in, the test checks, in order:
+
+	1. spawns:     both players spawned at different deathmatch spawn points
+	2. collision:  the runner moved, and no player ever ended up inside
+	               the world or outside the arena
+	3. pickups:    the target picks up mega health and the rocket launcher
+	4. combat:     the runner's railgun shot kills the target and scores
+	5. respawn:    the target respawns at a deathmatch spawn point
+
+	Each check prints "RAVAGE matchtest: ok <name>" or "FAIL <name>: why".
+	The server quits when all checks have run.
+*/
+
+float mt_phase;
+float mt_phase_time;
+float mt_errors;
+float mt_errors_before;	// mt_errors when the current check started
+float mt_started;
+entity mt_runner;
+entity mt_target;
+entity mt_item;
+
+void(string name) MatchTest_Ok =
+{
+	print("RAVAGE matchtest: ok ", name, "\n");
+};
+
+void(string name, string why) MatchTest_Fail =
+{
+	print("RAVAGE matchtest: FAIL ", name, ": ", why, "\n");
+	mt_errors = mt_errors + 1;
+};
+
+void(float phase) MatchTest_Next =
+{
+	mt_phase = phase;
+	mt_phase_time = time;
+};
+
+void() MatchTest_Finish =
+{
+	if (mt_errors)
+		print("RAVAGE matchtest: FAIL (", ftos(mt_errors), " errors)\n");
+	else
+		print("RAVAGE matchtest: PASS\n");
+	localcmd("quit\n");
+	mt_phase = 99;
+};
+
+entity(string name) MatchTest_FindPlayer =
+{
+	local entity p;
+
+	for (p = find(world, classname, "player"); p; p = find(p, classname, "player"))
+		if (p.netname == name && p.health > 0)
+			return p;
+	return world;
+};
+
+// A player may never be inside solid world geometry or below the floor.
+void() MatchTest_CheckCollision =
+{
+	local entity p;
+
+	for (p = find(world, classname, "player"); p; p = find(p, classname, "player"))
+	{
+		if (p.health <= 0)
+			continue;
+		tracebox(p.origin, VEC_HULL_MIN, VEC_HULL_MAX, p.origin, MOVE_NOMONSTERS, p);
+		if (trace_startsolid || pointcontents(p.origin) == CONTENT_SOLID)
+		{
+			MatchTest_Fail("collision", strcat(p.netname, " is inside the world at ", vtos(p.origin)));
+			MatchTest_Finish();
+			return;
+		}
+		if (p.origin_z < world.mins_z || p.origin_x < world.mins_x || p.origin_x > world.maxs_x
+			|| p.origin_y < world.mins_y || p.origin_y > world.maxs_y)
+		{
+			MatchTest_Fail("collision", strcat(p.netname, " left the arena at ", vtos(p.origin)));
+			MatchTest_Finish();
+			return;
+		}
+	}
+};
+
+void() MatchTest_Frame =
+{
+	local entity oldself;
+	local vector src;
+
+	if (!cvar("rv_matchtest") || mt_phase == 99)
+		return;
+	if (!mt_started)
+	{
+		mt_started = TRUE;
+		MatchTest_Next(0);
+	}
+	if (time - mt_phase_time > 30)
+	{
+		MatchTest_Fail(ftos(mt_phase), "timed out");
+		MatchTest_Finish();
+		return;
+	}
+	if (mt_phase > 0)
+		MatchTest_CheckCollision();
+	if (mt_phase == 99)
+		return;
+
+	switch (mt_phase)
+	{
+	case 0:	// wait for both clients
+		mt_runner = MatchTest_FindPlayer("runner");
+		mt_target = MatchTest_FindPlayer("target");
+		if (!mt_runner || !mt_target)
+			return;
+		if (!mt_runner.rv_spawn_index || !mt_target.rv_spawn_index)
+			MatchTest_Fail("spawns", "a player did not use an info_player_deathmatch");
+		else if (mt_runner.rv_spawn_index == mt_target.rv_spawn_index)
+			MatchTest_Fail("spawns", "both players used the same spawn point");
+		else
+			MatchTest_Ok("spawns");
+		MatchTest_Next(1);
+		return;
+
+	case 1:	// let the runner run into the level for three seconds
+		if (time - mt_phase_time < 3)
+			return;
+		if (vlen(mt_runner.origin - mt_runner.rv_spawn_origin) < 100)
+			MatchTest_Fail("collision", strcat("runner did not move: ", vtos(mt_runner.origin)));
+		else
+			MatchTest_Ok("collision");
+		mt_target.health = 100;
+		mt_errors_before = mt_errors;
+		mt_item = find(world, classname, "item_health_mega");
+		setorigin(mt_target, mt_item.origin + '0 0 25');
+		MatchTest_Next(2);
+		return;
+
+	case 2:	// mega health
+		if (mt_item.solid == SOLID_TRIGGER && time - mt_phase_time < 2)
+			return;
+		if (mt_item.solid == SOLID_TRIGGER)
+			MatchTest_Fail("pickups", "mega health was not picked up");
+		else if (mt_target.health < 199)
+			MatchTest_Fail("pickups", strcat("mega health gave ", ftos(mt_target.health), " health"));
+		mt_item = find(world, classname, "weapon_rocketlauncher");
+		setorigin(mt_target, mt_item.origin + '0 0 25');
+		MatchTest_Next(3);
+		return;
+
+	case 3:	// rocket launcher
+		if (mt_item.solid == SOLID_TRIGGER && time - mt_phase_time < 2)
+			return;
+		if (!(mt_target.items & IT_ROCKET) || mt_target.weapon != WEP_ROCKET || mt_target.ammo_rockets < 10)
+			MatchTest_Fail("pickups", "rocket launcher was not picked up and selected");
+		else if (mt_errors == mt_errors_before)
+			MatchTest_Ok("pickups");
+		// Stand both players on open floor with a clear line between them,
+		// and let lag compensation catch up with the move.
+		mt_target.health = 100;
+		mt_target.armorvalue = 0;
+		setorigin(mt_target, '0 -300 25');
+		MatchTest_Next(4);
+		return;
+
+	case 4:	// railgun shot from the runner
+		if (time - mt_phase_time < 1)
+			return;
+		oldself = self;
+		self = mt_runner;
+		setorigin(self, mt_target.origin - '300 0 0');
+		self.items = self.items | IT_RAILGUN;
+		self.ammo_slugs = 10;
+		self.attack_finished = 0;
+		src = self.origin + self.view_ofs;
+		self.v_angle = vectoangles(mt_target.origin - src);	// makevectors() turns this back into the same direction
+		W_Fire(WEP_RAILGUN);
+		self = oldself;
+		if (mt_target.health > 0)
+			MatchTest_Fail("combat", strcat("target survived with ", ftos(mt_target.health), " health"));
+		else if (mt_runner.frags != 1)
+			MatchTest_Fail("combat", strcat("runner has ", ftos(mt_runner.frags), " frags, expected 1"));
+		else
+			MatchTest_Ok("combat");
+		MatchTest_Next(5);
+		return;
+
+	case 5:	// automatic respawn
+		if (mt_target.health <= 0)
+			return;
+		if (!mt_target.rv_spawn_index)
+			MatchTest_Fail("respawn", "target respawned away from a spawn point");
+		else
+			MatchTest_Ok("respawn");
+		MatchTest_Finish();
+		return;
+	}
+};

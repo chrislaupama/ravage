@@ -179,6 +179,8 @@ cvar_t	sv_playerslots	= CVARAD("sv_playerslots",	"",
 cvar_t	maxclients		= CVARAFD("maxclients",		"8",
 								 "sv_maxclients",			CVAR_SERVERINFO, "Specify the maximum number of players allowed on the server at once. Can be changed mid-map.");
 cvar_t	maxspectators	= CVARFD("maxspectators",	"8",	CVAR_SERVERINFO, "Specify the maximum number of spectators allowed on the server at once. Can be changed mid-map.");
+//RAVAGE: let players in as spectators when every player slot is taken.
+cvar_t	sv_fullspectate	= CVARD("sv_fullspectate",	"0",	"When the server has maxclients players, anyone else who connects joins as a spectator instead of being turned away.");
 #ifdef SERVERONLY
 cvar_t	deathmatch		= CVARF("deathmatch",		"1",	CVAR_SERVERINFO);			// 0, 1, or 2
 #else
@@ -2968,6 +2970,14 @@ void SV_DoDirectConnect(svconnectinfo_t *fte_restrict info)
 		}
 
 		/*only q1/h2 has a maxclients/maxspectators separation. q2 or q3 the gamecode enforces any such clienttype limits*/
+		//RAVAGE: with sv_fullspectate, a player joining a full server comes in as a
+		//spectator instead of being turned away (a Duel server has two player slots).
+		if (svprogfuncs && sv_fullspectate.ival && !spectator && clients >= maxclients.ival && spectators < maxspectators.ival &&
+			!(spectator_password.string[0] && stricmp(spectator_password.string, "none") && !NET_IsLoopBackAddress(&info->adr)))
+		{
+			spectator = true;
+			Info_SetValueForStarKey (info->seat[0].info, "*spectator", "1", sizeof(info->seat[0].info));
+		}
 		if (svprogfuncs)
 		{
 			if (spectator && spectators >= maxspectators.ival)
@@ -5915,6 +5925,7 @@ void SV_InitLocal (void)
 	Cvar_Register (&samelevel,	cvargroup_serverinfo);
 	Cvar_Register (&maxclients,	cvargroup_serverinfo);
 	Cvar_Register (&maxspectators,	cvargroup_serverinfo);
+	Cvar_Register (&sv_fullspectate,	cvargroup_serverinfo);	//RAVAGE
 	Cvar_Register (&sv_playerslots,	cvargroup_serverinfo);
 	Cvar_Register (&hostname,	cvargroup_serverinfo);
 	Cvar_Register (&deathmatch,	cvargroup_serverinfo);

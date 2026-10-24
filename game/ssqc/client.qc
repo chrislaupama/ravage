@@ -18,6 +18,11 @@ void() ClientConnect =
 void() ClientDisconnect =
 {
 	bprint(PRINT_HIGH, self.netname, " left the arena\n");
+	// The engine keeps the entity, so stop it counting as a player.
+	self.classname = "";
+	self.solid = SOLID_NOT;
+	self.takedamage = DAMAGE_NO;
+	setmodel(self, "");
 };
 
 void() ClientKill =
@@ -121,7 +126,9 @@ void() PlayerPostThink =
 	if (rv_intermission || self.deadflag)
 		return;
 
-	W_Frame();
+	// Nobody fires during the countdown.
+	if (rv_match_state != MATCH_COUNTDOWN)
+		W_Frame();
 	Player_Animate();
 
 	// Health over 100 ticks down by one per second.

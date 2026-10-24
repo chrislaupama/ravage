@@ -5,6 +5,7 @@
 void(float apilevel, string enginename, float engineversion) CSQC_Init =
 {
 	View_Init();
+	Hud_Init();
 	registercommand("rv_hudtest", "Print the stats the HUD shows (used by tests/match.sh)");
 	registercommand("rv_framebench", "rv_framebench <frames> [players]: time whole frames while turning the view, optionally among running player models (used by tools/bench-map.sh)");
 };
@@ -31,6 +32,16 @@ void(float vwidth, float vheight, float notmenu) CSQC_UpdateView =
 {
 	View_Draw();
 	Hud_Draw([vwidth, vheight]);
+	Hud_Announcer();
+};
+
+// F3 readies up (or back down) during warmup, like typing "ready".
+float(float evtype, float scanx, float chary, float devid) CSQC_InputEvent =
+{
+	if (evtype != IE_KEYDOWN || scanx != K_F3 || getstatf(STAT_RV_MATCH_STATE) > MATCH_COUNTDOWN)
+		return FALSE;
+	localcmd(getstatf(STAT_RV_READY) ? "cmd notready\n" : "cmd ready\n");
+	return TRUE;
 };
 
 // Declared __used by the engine definitions, so it needs a body. Input is

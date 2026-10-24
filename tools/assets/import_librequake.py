@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Import the player and the weapons from LibreQuake.
+"""Import the player, the weapons, the pickups and projectiles from LibreQuake.
 
-Reads LibreQuake's Blender sources (lq1/progs/src/*.mdl.blend) and writes
-content/models:
+Reads LibreQuake's Blender sources (lq1/progs/src/*.mdl.blend), and the
+brush models its health and ammo boxes are built from
+(lq1/maps/src/brushmodels), and writes content/models:
 
   player.iqm                    the player's mesh, skeleton and animations
   v_<weapon>.md3                first-person weapons, with idle and fire animations
   v_<weapon>.md3.framegroups    their animations' frame ranges
   g_<weapon>.iqm                weapon pickups
+  health*.iqm, ammo_*.iqm       health and ammo pickups, with their skins in pickups/
+  armor_*.iqm                   armor pickups
+  rocket.iqm, grenade.iqm       projectiles
   *_skin.png, *_skin_luma.png   LibreQuake's skins, recoloured for RAVAGE, and
                                 their glowing parts
 
@@ -38,13 +42,14 @@ LIBREQUAKE_COMMIT is the revision the committed files came from.
 import colorsys
 import math
 import os
+import re
 import struct
 import sys
 
 import bpy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from make_models import png, write_iqm  # noqa: E402
+from iqm import cross, dot, normalize, png, sub, write_iqm  # noqa: E402
 
 LIBREQUAKE_COMMIT = 'dd4d5bffcabbcf9ceca32a1d83829109928c3f08'
 
@@ -127,15 +132,20 @@ def recolour_player(x, y, rgb):
 GUNMETAL = [(8, 10, 14), (40, 48, 60), (104, 116, 132), (186, 198, 214), (238, 244, 250)]
 
 
+def brightness_gain(image):
+    """How much to brighten image so its brightest twentieth is at full."""
+    pixels = image.pixels[:]
+    values = sorted(max(pixels[i:i + 3]) for i in range(0, len(pixels), 4))
+    values = [v for v in values if v > 0.03] or [1.0]
+    return 1 / max(values[len(values) * 19 // 20], 0.1)
+
+
 def weapon_recolour(energy, image):
     """A recolour for a weapon skin whose hot parts glow in energy.
 
     LibreQuake's weapons are dark, so brightness is first stretched until
     the brightest twentieth of the skin is at full."""
-    pixels = image.pixels[:]
-    values = sorted(max(pixels[i:i + 3]) for i in range(0, len(pixels), 4))
-    values = [v for v in values if v > 0.03] or [1.0]
-    gain = 1 / max(values[len(values) * 19 // 20], 0.1)
+    gain = brightness_gain(image)
 
     def recolour(x, y, rgb):
         r, g, b = (c / 255 for c in rgb)
@@ -159,8 +169,8 @@ def weapon_recolour(energy, image):
     return recolour
 
 
-def write_skin(image, recolour, out, name):
-    """Write image, recoloured, as <name>.png and <name>_luma.png."""
+def recoloured(image, recolour):
+    """image's pixels, recoloured: (rows, glow rows) of 8-bit RGB."""
     width, height = image.size
     pixels = image.pixels[:]
     rows, luma_rows = [], []
@@ -174,8 +184,21 @@ def write_skin(image, recolour, out, name):
             luma_row.extend(min(255, round(c)) for c in (glow or (0, 0, 0)))
         rows.append(row)
         luma_rows.append(luma_row)
+    return rows, luma_rows
+
+
+def write_png_pair(out, name, rows, luma_rows):
+    """Write <name>.png, and its glowing parts, if it has any, as
+    <name>_luma.png."""
+    width, height = len(rows[0]) // 3, len(rows)
     png(os.path.join(out, name + '.png'), width, height, rows)
-    png(os.path.join(out, name + '_luma.png'), width, height, luma_rows)
+    if any(any(row) for row in luma_rows):
+        png(os.path.join(out, name + '_luma.png'), width, height, luma_rows)
+
+
+def write_skin(image, recolour, out, name):
+    """Write image, recoloured, as <name>.png and <name>_luma.png."""
+    write_png_pair(out, name, *recoloured(image, recolour))
 
 
 #
@@ -396,6 +419,258 @@ def write_view_weapon(librequake, lq, energy, out, name):
         f.write('0 1 %g true idle\n' % FRAMERATE)
         f.write('1 %d %g false fire\n' % (len(frames) - 1, FRAMERATE))
 
+#
+# Pickups and projectiles
+#
+
+def write_mdl_item(librequake, lq, recolour, out, name, skin=0):
+    """A static model from one of LibreQuake's .mdl sources, in its own
+    coordinates, with skin number skin recoloured."""
+    obj, _ = open_blend(librequake, lq)
+    image = bpy.data.images[skin]
+    bpy.context.scene.frame_set(bpy.context.scene.frame_start)
+    corners, tris, positions, normals = sample_mesh(obj)
+    write_skin(image, recolour(image), out, name + '_skin')
+    verts = [(positions[vi], uv, normals[vi]) for vi, uv in corners]
+    write_iqm(os.path.join(out, name + '.iqm'), name, verts, tris, 'models/%s_skin' % name)
+
+
+def armour_recolour(hue, colour):
+    """A recolour for an armor skin: its painted base, of the given hue,
+    becomes plating in colour, with the brightest edges glowing, and the
+    rest becomes gunmetal."""
+    def make(image):
+        gain = brightness_gain(image)
+
+        def recolour(x, y, rgb):
+            h, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
+            v = min(1.0, v * gain)
+            if s > 0.18 and abs((h * 360 - hue + 180) % 360 - 180) < 18:
+                plate = ramp([(10, 12, 16), tuple(c * 0.3 for c in colour), colour,
+                              lerp(colour, (255, 255, 255), 0.35)], v)
+                return plate, (tuple(c * 0.3 for c in colour) if v > 0.8 else None)
+            return ramp(GUNMETAL, v), None
+        return recolour
+    return make
+
+
+# LibreQuake's health and ammo boxes are brush models, built in TrenchBroom
+# (lq1/maps/src/brushmodels) with textures from texture-wads/lq_health_ammo.
+# Each is turned into a mesh, with its textures recoloured in the item's
+# energy colour: the medkits' red crosses and the ammo boxes'
+# lights glow in it.
+BRUSH_ITEMS = {
+    # name: (brush model, energy colour, scale)
+    'health_small': ('b_bh10', (120, 255, 140), 1.0),
+    'health': ('b_bh25', (255, 220, 80), 1.0),
+    'health_large': ('b_bh25', (255, 150, 60), 1.25),
+    'health_mega': ('b_bh100', (180, 110, 255), 1.0),
+    'ammo_shells': ('b_shell1', WEAPONS['shotgun'][1], 1.0),
+    'ammo_bullets': ('b_nail1', WEAPONS['machinegun'][1], 1.0),
+    'ammo_rockets': ('b_rock1', WEAPONS['rocketlauncher'][1], 1.0),
+    'ammo_grenades': ('b_rock0', WEAPONS['grenadelauncher'][1], 1.0),
+    'ammo_cells': ('b_batt1', WEAPONS['lightning'][1], 1.0),
+    'ammo_slugs': ('b_nail0', WEAPONS['railgun'][1], 1.0),
+}
+
+MAP_FACE = re.compile(r'\(([^)]*)\)\s*\(([^)]*)\)\s*\(([^)]*)\)\s*(\S+)\s*'
+                      r'\[([^\]]*)\]\s*\[([^\]]*)\]\s*(\S+)\s+(\S+)\s+(\S+)')
+EPSILON = 0.01
+
+
+def read_brushes(path):
+    """The brushes of a Valve 220 .map file. A brush is a list of faces:
+    (normal, distance, texture, (u axis, u offset), (v axis, v offset),
+    (u scale, v scale)). A point x is inside a face's plane when
+    dot(normal, x) <= distance."""
+    brushes, brush, depth = [], None, 0
+    for line in open(path):
+        line = line.strip()
+        if line == '{':
+            depth += 1
+            if depth == 2:
+                brush = []
+        elif line == '}':
+            if depth == 2 and brush:
+                brushes.append(brush)
+            depth -= 1
+        elif depth == 2 and line.startswith('('):
+            m = MAP_FACE.match(line)
+            p0, p1, p2 = (tuple(float(c) for c in m.group(k).split()) for k in (1, 2, 3))
+            normal = normalize(cross(sub(p0, p1), sub(p2, p1)))
+            u, v = ([float(c) for c in m.group(k).split()] for k in (5, 6))
+            brush.append((normal, dot(normal, p1), m.group(4), (u[:3], u[3]), (v[:3], v[3]),
+                          (float(m.group(8)), float(m.group(9)))))
+    return brushes
+
+
+def clip(polygon, normal, distance, keep_front=False):
+    """The part of a convex polygon behind (or in front of) a plane."""
+    sign = -1 if keep_front else 1
+    dists = [sign * (dot(normal, p) - distance) for p in polygon]
+    out = []
+    for i, p in enumerate(polygon):
+        q, dp, dq = polygon[(i + 1) % len(polygon)], dists[i], dists[(i + 1) % len(polygon)]
+        if dp <= EPSILON:
+            out.append(p)
+        if (dp < -EPSILON and dq > EPSILON) or (dp > EPSILON and dq < -EPSILON):
+            t = dp / (dp - dq)
+            out.append(tuple(a + (b - a) * t for a, b in zip(p, q)))
+    return out if len(out) >= 3 else []
+
+
+def brush_polygon(brush, face):
+    """The polygon of one face of a convex brush, wound counter-clockwise
+    seen from outside."""
+    normal, distance = brush[face][:2]
+    up = (0, 0, 1) if abs(normal[2]) < 0.9 else (1, 0, 0)
+    u = normalize(cross(up, normal))
+    v = cross(normal, u)
+    centre = tuple(c * distance for c in normal)
+    size = 4096
+    polygon = [tuple(c + (a * su + b * sv) * size for c, a, b in zip(centre, u, v))
+               for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    for k, (other_normal, other_distance, *_) in enumerate(brush):
+        if k != face and polygon:
+            polygon = clip(polygon, other_normal, other_distance)
+    return polygon
+
+
+def outside(polygon, normal, brush, first):
+    """The parts of a face's polygon that aren't inside another brush, so
+    faces hidden where brushes overlap or touch are left out. Where two
+    faces lie on top of each other, the one from the earlier brush is
+    kept: first says whether that's this face's."""
+    parts = []
+    for other_normal, other_distance, *_ in brush:
+        if all(abs(dot(other_normal, p) - other_distance) < EPSILON for p in polygon):
+            if dot(normal, other_normal) > 0 and first:
+                return parts + [polygon]
+            continue
+        front = clip(polygon, other_normal, other_distance, keep_front=True)
+        if front:
+            parts.append(front)
+        polygon = clip(polygon, other_normal, other_distance)
+        if not polygon:
+            return parts
+    return parts
+
+
+def texture_path(librequake, texture):
+    base = os.path.join(librequake, 'texture-wads', 'lq_health_ammo', texture.replace('+', 'plus_'))
+    return base + '.png' if os.path.exists(base + '.png') else base + '_fbr.png'
+
+
+def split_tiles(polygon, axes):
+    """Split a polygon where its texture repeats: along every whole number
+    of each texture coordinate. axes are (vector, offset) per coordinate,
+    giving it as dot(vector, point) + offset."""
+    pieces = [polygon]
+    for vector, offset in axes:
+        length = math.sqrt(dot(vector, vector))
+        normal = tuple(c / length for c in vector)
+        values = [dot(vector, p) + offset for p in polygon]
+        for k in range(math.floor(min(values)) + 1, math.ceil(max(values))):
+            distance = (k - offset) / length
+            pieces = [part for piece in pieces
+                      for part in (clip(piece, normal, distance), clip(piece, normal, distance, keep_front=True)) if part]
+    return pieces
+
+
+TILE_PAD = 4    # texels of repeated texture around each tile in an atlas
+
+
+def write_brush_item(librequake, lq, energy, scale, out, name):
+    brushes = read_brushes(os.path.join(librequake, 'lq1', 'maps', 'src', 'brushmodels', lq + '.map'))
+    faces = []      # (polygon, face)
+    for b, brush in enumerate(brushes):
+        for f, face in enumerate(brush):
+            pieces = [brush_polygon(brush, f)]
+            for o, other in enumerate(brushes):
+                if o != b:
+                    pieces = [part for piece in pieces if piece for part in outside(piece, face[0], other, b < o)]
+            faces.extend((piece, face) for piece in pieces if piece)
+
+    # Centre the item on its origin, standing on the floor, so it spins in
+    # place. The floor hides its underside, so that is left out.
+    points = [p for polygon, _ in faces for p in polygon]
+    lo = [min(p[k] for p in points) for k in range(3)]
+    hi = [max(p[k] for p in points) for k in range(3)]
+    centre = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2])
+    faces = [(polygon, face) for polygon, face in faces
+             if not (face[0][2] < -0.99 and all(abs(p[2] - lo[2]) < EPSILON for p in polygon))]
+
+    # One skin per item, so it draws in one go: its textures, recoloured,
+    # side by side in an atlas. Faces are cut where their texture repeats,
+    # so each piece maps onto one copy of it.
+    textures = sorted({face[2] for _, face in faces})
+    images = [bpy.data.images.load(texture_path(librequake, t)) for t in textures]
+    size = images[0].size[0]
+    assert all(tuple(image.size) == (size, size) for image in images), 'textures must be square and the same size'
+    columns = math.ceil(math.sqrt(len(textures)))
+    tile_rows = math.ceil(len(textures) / columns)
+    slot = size + 2 * TILE_PAD
+    width, height = columns * slot, tile_rows * slot
+    atlas = [[0] * (width * 3) for _ in range(height)]
+    luma = [[0] * (width * 3) for _ in range(height)]
+    for i, image in enumerate(images):
+        tile, glow = recoloured(image, weapon_recolour(energy, image))
+        x0, y0 = (i % columns) * slot, (i // columns) * slot
+        for y in range(slot):
+            for x in range(slot):
+                sx, sy = (x - TILE_PAD) % size, (y - TILE_PAD) % size
+                atlas[y0 + y][(x0 + x) * 3:(x0 + x) * 3 + 3] = tile[sy][sx * 3:sx * 3 + 3]
+                luma[y0 + y][(x0 + x) * 3:(x0 + x) * 3 + 3] = glow[sy][sx * 3:sx * 3 + 3]
+        bpy.data.images.remove(image)
+    skins = os.path.join(out, 'pickups')
+    os.makedirs(skins, exist_ok=True)
+    write_png_pair(skins, name, atlas, luma)
+
+    verts, tris = [], []
+    for polygon, (normal, _, texture, (u_axis, u_offset), (v_axis, v_offset), (u_scale, v_scale)) in faces:
+        # Texture coordinates in copies of the texture.
+        axes = ((tuple(c / (u_scale * size) for c in u_axis), u_offset / size),
+                (tuple(c / (v_scale * size) for c in v_axis), v_offset / size))
+        i = textures.index(texture)
+        x0, y0 = (i % columns) * slot + TILE_PAD, (i // columns) * slot + TILE_PAD
+        for piece in split_tiles(polygon, axes):
+            uvs = [tuple(dot(vector, p) + offset for vector, offset in axes) for p in piece]
+            tile = [math.floor(sum(c) / len(uvs)) for c in zip(*uvs)]
+            first = len(verts)
+            for p, uv in zip(piece, uvs):
+                position = tuple(round((c - o) * scale, 3) for c, o in zip(p, centre))
+                verts.append((position, ((x0 + (uv[0] - tile[0]) * size) / width,
+                                         (y0 + (uv[1] - tile[1]) * size) / height), normal))
+            for k in range(1, len(piece) - 1):
+                # IQM front faces wind clockwise as seen from outside.
+                tris.append((first, first + k + 1, first + k))
+    write_iqm(os.path.join(out, name + '.iqm'), name, verts, tris, 'models/pickups/' + name)
+
+
+ARMOURS = {
+    # name: (skin, the skin's painted hue, colour)
+    'armor_light': (0, 135, (120, 255, 140)),
+    'armor_medium': (1, 42, (255, 210, 70)),
+    'armor_heavy': (2, 0, (255, 70, 60)),
+}
+SHARD = (25, (255, 160, 60))      # the shard's painted hue, and its colour
+
+MDL_ITEMS = {
+    # name: (model, energy colour)
+    'rocket': ('missile', WEAPONS['rocketlauncher'][1]),
+    'grenade': ('grenade', WEAPONS['grenadelauncher'][1]),
+}
+
+
+def write_items(librequake, out):
+    for name, (skin, hue, colour) in ARMOURS.items():
+        write_mdl_item(librequake, 'armor', armour_recolour(hue, colour), out, name, skin)
+    write_mdl_item(librequake, 'armorshard', armour_recolour(*SHARD), out, 'armor_shard')
+    for name, (lq, energy) in MDL_ITEMS.items():
+        write_mdl_item(librequake, lq, lambda image, energy=energy: weapon_recolour(energy, image), out, name)
+    for name, (lq, energy, scale) in BRUSH_ITEMS.items():
+        write_brush_item(librequake, lq, energy, scale, out, name)
+
 
 def main():
     if len(sys.argv) < 2:
@@ -408,7 +683,9 @@ def main():
     for name, (lq, energy) in WEAPONS.items():
         write_view_weapon(librequake, lq, energy, out, 'v_' + name)
         write_pickup(librequake, lq, energy, out, 'g_' + name)
-    print('wrote the player and %d weapons to %s' % (len(WEAPONS), os.path.normpath(out)))
+    write_items(librequake, out)
+    print('wrote the player, %d weapons and %d pickups and projectiles to %s'
+          % (len(WEAPONS), len(ARMOURS) + 1 + len(MDL_ITEMS) + len(BRUSH_ITEMS), os.path.normpath(out)))
 
 
 if __name__ == '__main__':

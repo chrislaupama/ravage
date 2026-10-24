@@ -100,8 +100,8 @@ light -bounce -extra4 <map>.bsp
 `tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and turns the view a full circle from the first spawn point, three times with each of two measurements, printing the frame rate:
 
 - `timerefresh` times the engine drawing the 3D view alone.
-- `framebench` (the game's `rv_framebench` command) times whole frames, including the HUD, the first-person weapon and the client game code.
+- `framebench` (the game's `rv_framebench` command) times whole frames, including the HUD, the first-person weapon and the client game code. It runs three times on its own, then three times with 16 animated player models running in a ring around the view, which times skeletal animation.
 
 Compare before and after renderer, map or HUD changes, over several runs.
 
-The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080 with `timerefresh`, and about 70 fps at 1280x720 with `framebench`.
+The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080 with `timerefresh`, and about 70 fps at 1280x720 with `framebench`, or about 58 with the 16 player models.

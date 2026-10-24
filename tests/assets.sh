@@ -1,8 +1,9 @@
 #!/bin/sh
-# Placeholder asset test: the committed models, skins and sounds match what
+# Asset test: the committed models, skins and sounds match what
 # tools/assets/ generates (so nobody edits a generated file by hand or
 # forgets to regenerate), and every model or sound the game code names
-# exists in content/.
+# exists in content/. The files import_librequake.py makes need Blender and
+# LibreQuake, so they are only checked for being there.
 #
 #   tests/assets.sh
 set -eu
@@ -15,12 +16,14 @@ fail=0
 
 "$python" "$root/tools/assets/make_models.py" "$work" > /dev/null
 "$python" "$root/tools/assets/make_sounds.py" "$work" > /dev/null
-for dir in models sound; do
-	if ! diff -r "$root/content/$dir" "$work/$dir" > /dev/null; then
-		echo "FAIL content/$dir differs from what tools/assets/ generates; rerun the generators"
-		diff -rq "$root/content/$dir" "$work/$dir" || true
+for file in $(cd "$work" && find models sound -type f | sort); do
+	if ! cmp -s "$root/content/$file" "$work/$file"; then
+		echo "FAIL content/$file differs from what tools/assets/ generates; rerun the generators"
 		fail=1
 	fi
+done
+for file in player.iqm player_skin.png player_skin_luma.png LICENSE.librequake CREDITS.librequake; do
+	[ -f "$root/content/models/$file" ] || { echo "FAIL missing content/models/$file"; fail=1; }
 done
 
 # Model paths are relative to the game folder, sound paths to its sound/.

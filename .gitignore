@@ -36,3 +36,4 @@ content/maps/*.lin
 content/maps/*.log
 content/maps/*-compile.map
 content/maps/autosave/
+__pycache__/

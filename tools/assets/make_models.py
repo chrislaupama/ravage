@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Generate RAVAGE's placeholder models.
+"""Generate RAVAGE's weapon, pickup and projectile models.
 
-Writes static IQM models and the skin they share into content/models:
+Writes IQM models and the skin they share into content/models. The player
+comes from LibreQuake instead; see import_librequake.py.
 
-  player.iqm                      the player
   g_<weapon>.iqm, v_<weapon>.iqm  weapon pickups and first-person weapons
   <item>.iqm                      health, armor and ammo pickups
   rocket.iqm, grenade.iqm         projectiles
   skin.png, skin_luma.png         the shared skin and its glowing parts
 
-Every model is built here from boxes, cylinders and other simple solids,
-so they contain no third-party artwork. They are placeholders: blocky,
-unanimated and readable from a distance, until real art replaces them.
-Units are Quake units, x points forward and z up.
+Every model is built here from boxes, prisms, cylinders and other simple
+solids, so the geometry and skin contain no third-party artwork. The
+first-person weapons are animated: their idle and fire animations, with
+recoil and a muzzle flash, follow LibreQuake's weapons, read from
+librequake_weapons.json (BSD-3, see content/models/LICENSE.librequake).
+The rest are static. Units are Quake units, x points forward and z up.
 
 Usage: make_models.py [content-dir]    (default: the repository's content/)
 
@@ -20,6 +22,7 @@ Only the Python standard library is used. The output is deterministic, so
 running the script again without changes gives byte-identical files.
 """
 
+import json
 import math
 import os
 import struct
@@ -36,7 +39,7 @@ CELLS = [
     ('dark',        (52, 56, 64),    False),
     ('mid',         (98, 104, 114),  False),
     ('light',       (172, 178, 188), False),
-    ('brown',       (118, 90, 62),   False),
+    ('slate',       (64, 78, 98),    False),
     ('orange',      (230, 120, 40),  False),
     ('red',         (196, 40, 36),   False),
     ('white',       (236, 236, 230), False),
@@ -141,7 +144,9 @@ class Mesh:
 
     def __init__(self):
         self.verts = []    # (position, uv, normal)
+        self.joints = []   # the joint that moves each vertex
         self.tris = []
+        self.joint = 0     # joint for the parts added next
 
     def face(self, points, cell, inside):
         """Add a convex polygon facing away from the point inside."""
@@ -162,6 +167,7 @@ class Mesh:
         first = len(self.verts)
         for p, uv in zip(points, uvs):
             self.verts.append((p, uv, normal))
+            self.joints.append(self.joint)
         for k in range(1, len(points) - 1):
             # IQM front faces wind clockwise as seen from outside.
             self.tris.append((first, first + k + 1, first + k))
@@ -201,6 +207,17 @@ class Mesh:
         for t in (start, end):
             self.face([point(t, a) for a in angles], cap or cell, inside)
 
+    def prism(self, profile, y0, y1, cell, side=None):
+        """A convex side profile, as (x, z) points, extruded from y0 to y1.
+        side gives the two flat sides another cell."""
+        inside = centroid([(x, (y0 + y1) / 2, z) for x, z in profile])
+        n = len(profile)
+        for k in range(n):
+            (xa, za), (xb, zb) = profile[k], profile[(k + 1) % n]
+            self.face([(xa, y0, za), (xb, y0, zb), (xb, y1, zb), (xa, y1, za)], cell, inside)
+        for y in (y0, y1):
+            self.face([(x, y, z) for x, z in profile], side or cell, inside)
+
     def octahedron(self, centre, rx, ry, rz, cell):
         cx, cy, cz = centre
         top, bottom = (cx, cy, cz + rz), (cx, cy, cz - rz)
@@ -213,56 +230,132 @@ class Mesh:
     def moved(self, offset, scale=1.0):
         m = Mesh()
         m.verts = [(tuple(p * scale + o for p, o in zip(pos, offset)), uv, n) for pos, uv, n in self.verts]
+        m.joints = list(self.joints)
         m.tris = list(self.tris)
         return m
+
+    def part(self, joint):
+        """Only the triangles that follow the given joint."""
+        m = Mesh()
+        keep = [t for t in self.tris if all(self.joints[i] == joint for i in t)]
+        used = sorted({i for t in keep for i in t})
+        index = {old: new for new, old in enumerate(used)}
+        m.verts = [self.verts[i] for i in used]
+        m.joints = [joint] * len(used)
+        m.tris = [tuple(index[i] for i in t) for t in keep]
+        return m
+
+    def bounds(self, joint=0):
+        points = [v[0] for v, j in zip(self.verts, self.joints) if j == joint]
+        return tuple(map(min, zip(*points))), tuple(map(max, zip(*points)))
 
 
 #
 # IQM
 #
 
-IQM_POSITION, IQM_TEXCOORD, IQM_NORMAL = 0, 1, 2
-IQM_FLOAT = 7
+IQM_POSITION, IQM_TEXCOORD, IQM_NORMAL, IQM_BLENDINDEXES, IQM_BLENDWEIGHTS = 0, 1, 2, 4, 5
+IQM_UBYTE, IQM_FLOAT = 1, 7
+IQM_LOOP = 1
 
 
-def write_iqm(path, mesh, name):
-    text = b'\0' + name.encode() + b'\0' + MATERIAL.encode() + b'\0'
+def write_iqm(path, name, verts, tris, material=MATERIAL, blend=None, joints=(), anims=(), frames=()):
+    """Write an IQM model.
+
+    verts are (position, uv, normal) and tris index them, wound clockwise.
+    A skinned model also has, per vertex, blend: (4 joint indexes, 4 weights
+    out of 255); joints: (name, parent index or -1, rest pose); anims: (name,
+    first frame, frame count, frames per second, loops); and frames: for
+    every frame, a pose per joint. A pose is 10 numbers: translation, a
+    rotation quaternion (x, y, z, w) and scale, relative to the parent joint.
+    """
+    strings = [b'', name.encode(), material.encode()]
+    strings += [j[0].encode() for j in joints] + [a[0].encode() for a in anims]
+    text, offsets = b'', {}
+    for s in strings:
+        if s not in offsets:
+            offsets[s] = len(text)
+            text += s + b'\0'
     text += b'\0' * (-len(text) % 4)
-    n = len(mesh.verts)
 
-    header_size = 16 + 27 * 4
-    ofs_text = header_size
+    def string(s):
+        return offsets[s.encode()]
+
+    # Each pose channel is stored as 16 bits between its smallest and
+    # largest value over all frames.
+    channels = []
+    for j in range(len(joints)):
+        for c in range(10):
+            values = [frame[j][c] for frame in frames] or [0.0]
+            lo, hi = min(values), max(values)
+            channels.append((lo, (hi - lo) / 65535 if hi > lo else 0.0))
+
+    n, nj, nf = len(verts), len(joints), len(frames)
+    arrays = [(IQM_POSITION, IQM_FLOAT, 3, 12), (IQM_TEXCOORD, IQM_FLOAT, 2, 8), (IQM_NORMAL, IQM_FLOAT, 3, 12)]
+    if blend:
+        arrays += [(IQM_BLENDINDEXES, IQM_UBYTE, 4, 4), (IQM_BLENDWEIGHTS, IQM_UBYTE, 4, 4)]
+    ofs_text = 16 + 27 * 4
     ofs_meshes = ofs_text + len(text)
     ofs_varrays = ofs_meshes + 6 * 4
-    ofs_pos = ofs_varrays + 3 * 5 * 4
-    ofs_uv = ofs_pos + n * 12
-    ofs_norm = ofs_uv + n * 8
-    ofs_tris = ofs_norm + n * 12
-    size = ofs_tris + len(mesh.tris) * 12
+    ofs = ofs_varrays + len(arrays) * 5 * 4
+    array_offsets = []
+    for _, _, _, size in arrays:
+        array_offsets.append(ofs)
+        ofs += n * size
+    ofs_tris = ofs
+    ofs_joints = ofs_tris + len(tris) * 12
+    ofs_poses = ofs_joints + nj * 48
+    ofs_anims = ofs_poses + nj * 88
+    ofs_frames = ofs_anims + len(anims) * 20
+    size = ofs_frames + nf * nj * 10 * 2
+    size += -size % 4
+
+    def table(count, offset):
+        return (count, offset if count else 0)
 
     out = bytearray(b'INTERQUAKEMODEL\0')
     out += struct.pack('<27I',
                        2, size, 0,                    # version, filesize, flags
                        len(text), ofs_text,
                        1, ofs_meshes,
-                       3, n, ofs_varrays,
-                       len(mesh.tris), ofs_tris, 0,   # no adjacency
-                       0, 0, 0, 0, 0, 0,              # no joints, poses, anims
-                       0, 0, 0, 0,                    # no frames or bounds
-                       0, 0, 0, 0)                    # no comment or extensions
+                       len(arrays), n, ofs_varrays,
+                       len(tris), ofs_tris, 0,        # no adjacency
+                       *table(nj, ofs_joints),
+                       *table(nj if nf else 0, ofs_poses),
+                       *table(len(anims), ofs_anims),
+                       nf, nj * 10 if nf else 0, ofs_frames if nf else 0,
+                       0, 0, 0, 0, 0)                 # no bounds, comment or extensions
     out += text
-    out += struct.pack('<6I', 1, 1 + len(name) + 1, 0, n, 0, len(mesh.tris))
-    out += struct.pack('<5I', IQM_POSITION, 0, IQM_FLOAT, 3, ofs_pos)
-    out += struct.pack('<5I', IQM_TEXCOORD, 0, IQM_FLOAT, 2, ofs_uv)
-    out += struct.pack('<5I', IQM_NORMAL, 0, IQM_FLOAT, 3, ofs_norm)
-    for pos, _, _ in mesh.verts:
+    out += struct.pack('<6I', string(name), string(material), 0, n, 0, len(tris))
+    for (kind, fmt, size_, _), offset in zip(arrays, array_offsets):
+        out += struct.pack('<5I', kind, 0, fmt, size_, offset)
+    for pos, _, _ in verts:
         out += struct.pack('<3f', *pos)
-    for _, uv, _ in mesh.verts:
+    for _, uv, _ in verts:
         out += struct.pack('<2f', *uv)
-    for _, _, normal in mesh.verts:
+    for _, _, normal in verts:
         out += struct.pack('<3f', *normal)
-    for tri in mesh.tris:
+    if blend:
+        for indexes, _ in blend:
+            out += struct.pack('<4B', *indexes)
+        for _, weights in blend:
+            out += struct.pack('<4B', *weights)
+    for tri in tris:
         out += struct.pack('<3I', *tri)
+    for joint_name, parent, rest in joints:
+        out += struct.pack('<Ii10f', string(joint_name), parent, *rest)
+    if nf:
+        for j, (_, parent, _) in enumerate(joints):
+            ch = channels[j * 10:j * 10 + 10]
+            out += struct.pack('<iI20f', parent, 0x3FF, *[c[0] for c in ch], *[c[1] for c in ch])
+    for anim_name, first, count, rate, loops in anims:
+        out += struct.pack('<3IfI', string(anim_name), first, count, rate, IQM_LOOP if loops else 0)
+    for frame in frames:
+        for j in range(nj):
+            for c in range(10):
+                lo, scale = channels[j * 10 + c]
+                out += struct.pack('<H', round((frame[j][c] - lo) / scale) if scale else 0)
+    out += b'\0' * (size - len(out))
     assert len(out) == size
     with open(path, 'wb') as f:
         f.write(out)
@@ -272,70 +365,102 @@ def write_iqm(path, mesh, name):
 # Models
 #
 
-def player():
-    m = Mesh()
-    # Feet on the floor of the player box (z -24), head at its top (z 32).
-    for y0, y1 in ((-9, -2), (2, 9)):        # legs and boots
-        m.box((-5, y0, -18), (5, y1, 0), 'dark')
-        m.box((-6, y0 - 0.5, -24), (7, y1 + 0.5, -18), 'black')
-    for y0, y1 in ((-16, -11), (11, 16)):    # arms, hands and shoulder pads
-        m.box((-4, y0, 4), (4, y1, 20), 'dark')
-        m.box((-3, y0 + 0.5, 0), (3, y1 - 0.5, 4), 'black')
-        m.box((-5, y0 - 1, 16), (5, y1 + 1, 23), 'orange')
-    m.box((-7, -11, 2), (7, 11, 23), 'mid')
-    m.box((7, -8, 6), (9, 8, 19), 'orange')
-    m.box((-7.5, -11.5, 0), (7.5, 11.5, 3), 'black')
-    m.box((-6, -6, 23), (6, 6, 32), 'mid', {'+z': 'dark'})
-    m.box((6, -5, 26), (7, 5, 29.5), 'cyan_glow')
-    return m
+# Each weapon in its own space: x forward from the grip, y left, z up,
+# at pickup size. The designs are RAVAGE's own: white ceramic shells over
+# dark gunmetal, with glowing energy parts. Each returns its muzzle; parts
+# on joint 1 are the muzzle flash, which only shows while firing.
+
+def grip(m, x, cell='dark'):
+    m.prism([(x - 2, -3.5), (x + 2, -3.5), (x, -10.5), (x - 4, -10.5)], -1.4, 1.4, cell)
 
 
-# Each weapon in its own space: x forward from the grip, y left, z up.
+def stock(m, x, cell):
+    m.prism([(x, -3.5), (x, 2.5), (x - 10, 0.5), (x - 10, -4.5)], -1.6, 1.6, cell, 'dark')
+
+
+def flash(m, muzzle, length, width, cell):
+    m.joint = 1
+    x, y, z = muzzle
+    m.octahedron((x + length, y, z), length, width, width, cell)
+    m.octahedron((x + length * 0.6, y, z), length * 0.4, width * 1.6, width * 1.6, cell)
+    m.joint = 0
+    return muzzle
+
+
 def shotgun(m):
-    for y in (-1.4, 1.4):
-        m.cylinder('x', (y, 0), 1.2, 6, 30, 'light', 'black', 6)
-    m.box((0, -3, -3), (10, 3, 2), 'dark')
-    m.box((-10, -2, -5), (0, 2, 1), 'brown')
-    m.box((14, -2.6, -3), (22, 2.6, -1), 'brown')
+    m.prism([(-6, -3.5), (9, -3.5), (9, 2.5), (-4, 3.5)], -2.6, 2.6, 'dark', 'slate')
+    m.prism([(7, -2.5), (30, -1.5), (30, 2), (9, 3.2)], -2.2, 2.2, 'white')
+    m.box((10, -2.35, -0.2), (27, 2.35, 0.6), 'cyan_glow')
+    for y in (-1.1, 1.1):
+        m.cylinder('x', (y, 0.2), 0.9, 28, 33, 'black', None, 6)
+    m.box((14, -2.6, -4.4), (23, 2.6, -2.2), 'slate')
+    grip(m, 0)
+    stock(m, -6, 'white')
+    return flash(m, (33, 0, 0.2), 4, 2.5, 'orange_glow')
 
 
 def machinegun(m):
-    m.box((0, -3, -3), (16, 3, 3), 'mid')
-    m.box((2, -3.2, 0), (14, 3.2, 1), 'yellow')
-    m.cylinder('x', (0, 0), 1.5, 16, 32, 'black')
-    m.box((6, -1.5, -11), (10, 1.5, -3), 'dark')
-    m.box((-8, -2, -4), (0, 2, 1), 'dark')
+    m.prism([(-4, -3.5), (16, -3.5), (16, 3), (-2, 3.5)], -3, 3, 'dark', 'slate')
+    m.prism([(0, 3), (16, 3), (14, 5), (2, 5)], -2.4, 2.4, 'white')
+    m.cylinder('x', (0, 0.5), 2.2, 16, 30, 'mid', 'black', 6)
+    for x in (18, 22, 26):
+        m.box((x, -2.4, -0.4), (x + 1.5, 2.4, 1.4), 'black')
+    m.cylinder('x', (0, 0.5), 1, 30, 35, 'black', None, 6)
+    m.box((6, -2.5, -11), (11, 2.5, -3.5), 'slate')
+    m.box((6.5, -2.7, -9), (10.5, 2.7, -5), 'orange_glow')
+    grip(m, 1)
+    stock(m, -4, 'white')
+    return flash(m, (35, 0, 0.5), 3, 2, 'orange_glow')
 
 
 def rocketlauncher(m):
-    m.cylinder('x', (0, 1), 4, -6, 24, 'dark', 'black', 10)
-    m.cylinder('x', (0, 1), 4.4, 16, 20, 'orange_glow', None, 10)
-    m.cylinder('x', (0, 1), 4.8, 24, 27, 'orange', 'black', 10)
-    m.box((2, -1.5, -10), (6, 1.5, -3), 'black')
+    m.cylinder('x', (0, 1), 4, -8, 30, 'dark', 'black', 10)
+    m.prism([(-4, 1), (26, 1), (23, 6.4), (0, 6.4)], -4.4, 4.4, 'white')
+    m.box((2, -4.6, 2.6), (22, 4.6, 3.4), 'orange_glow')
+    m.cylinder('x', (0, 1), 4.6, 30, 33, 'slate', 'black', 10)
+    m.cylinder('x', (0, 1), 4.3, -11, -8, 'slate', 'orange_glow', 10)
+    m.box((6, -1, 6.4), (12, 1, 8.4), 'dark')
+    m.box((16, -1.2, -8), (19, 1.2, -2.8), 'dark')
+    grip(m, 6)
+    return flash(m, (33, 0, 1), 5, 4, 'orange_glow')
 
 
 def grenadelauncher(m):
-    m.box((-6, -3, -3), (6, 3, 3), 'mid')
-    m.cylinder('x', (0, 0), 5, 0, 9, 'green', 'dark', 10)
-    m.cylinder('x', (0, 1), 3, 9, 22, 'dark', 'black')
-    m.box((-1, -1.5, -10), (3, 1.5, -3), 'black')
+    m.prism([(-6, -3.5), (8, -3.5), (8, 3.5), (-4, 3.5)], -3.2, 3.2, 'slate', 'dark')
+    m.cylinder('x', (0, 0), 5.2, 0, 10, 'dark', 'slate', 6)
+    m.cylinder('x', (0, 0), 5.5, 3.5, 6.5, 'green_glow', None, 6)
+    m.cylinder('x', (0, 1), 2.8, 10, 25, 'white', 'black', 8)
+    m.cylinder('x', (0, 1), 3.3, 23, 27, 'dark', 'black', 8)
+    grip(m, -1)
+    stock(m, -6, 'white')
+    return flash(m, (27, 0, 1), 4, 3, 'green_glow')
 
 
 def lightning(m):
-    m.box((0, -3, -3), (18, 3, 3), 'blue')
+    m.prism([(-6, -4), (16, -3), (16, 3), (-4, 4)], -3.4, 3.4, 'blue', 'slate')
+    m.prism([(-2, 4), (14, 3), (12, 5.5), (0, 5.5)], -2.6, 2.6, 'white')
+    for x in (3, 7, 11):
+        m.cylinder('x', (0, 0), 3.9, x, x + 1.6, 'cyan_glow', None, 8)
     for k in range(3):
         a = 2 * math.pi * k / 3 + math.pi / 2
-        m.cylinder('x', (2.4 * math.cos(a), 2.4 * math.sin(a)), 0.7, 18, 30, 'light', None, 4)
-    m.cylinder('x', (0, 0), 1.6, 18, 25, 'cyan_glow')
-    m.box((4, -1.5, -10), (8, 1.5, -3), 'black')
+        m.cylinder('x', (2.4 * math.cos(a), 2.4 * math.sin(a)), 0.7, 16, 30, 'light', None, 4)
+    m.cylinder('x', (0, 0), 1.6, 16, 26, 'cyan_glow')
+    grip(m, 3)
+    return flash(m, (30, 0, 0), 5, 2.5, 'cyan_glow')
 
 
 def railgun(m):
-    m.box((-6, -2.5, -3), (26, 2.5, 2), 'dark')
-    for y0, y1 in ((-2.9, -1.5), (1.5, 2.9)):
-        m.box((0, y0, 2), (30, y1, 3.2), 'green_glow')
-    m.cylinder('x', (0, -0.5), 1.2, 26, 36, 'light', 'black', 6)
-    m.box((2, -1.5, -10), (6, 1.5, -3), 'black')
+    m.prism([(-8, -3), (28, -2.5), (28, 2), (-6, 3)], -2.4, 2.4, 'white')
+    for y0, y1 in ((-3, -1.6), (1.6, 3)):
+        m.box((0, y0, 2), (38, y1, 3.4), 'dark')
+    m.box((2, -1.6, 2), (36, 1.6, 2.8), 'green_glow')
+    m.cylinder('x', (0, -0.5), 1.2, 28, 40, 'light', 'black', 6)
+    m.cylinder('x', (0, 5.4), 1.4, 4, 14, 'dark', 'green_glow', 6)
+    m.box((8, -2, -6), (18, 2, -2.5), 'slate')
+    m.box((9, -2.2, -5), (17, 2.2, -3.5), 'green_glow')
+    grip(m, 2)
+    stock(m, -8, 'dark')
+    return flash(m, (40, 0, -0.5), 5, 1.6, 'green_glow')
 
 
 WEAPONS = {
@@ -347,11 +472,62 @@ WEAPONS = {
     'railgun': railgun,
 }
 
-# The pickup floats above the floor, centred so it spins in place. The
-# first-person model is half size, low and to the right of the eye.
+# The pickup floats above the floor, centred so it spins in place.
 WORLD_OFFSET = (-12, 0, 16)
-VIEW_OFFSET = (16, -6, -7)
-VIEW_SCALE = 0.5
+
+# The first-person model is a little over half size, low and to the right
+# of the eye, with the grip at VIEW_OFFSET. Its firing motion comes from
+# LibreQuake's matching weapon (see import_librequake.py).
+VIEW_OFFSET = (10, -6.5, -8.5)
+VIEW_SCALE = 0.55
+LIBREQUAKE_WEAPONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'librequake_weapons.json')
+
+
+def quaternion(r):
+    """A rotation matrix as an IQM quaternion (x, y, z, w), w >= 0."""
+    w = math.sqrt(max(0.0, 1 + r[0][0] + r[1][1] + r[2][2])) / 2
+    x = math.copysign(math.sqrt(max(0.0, 1 + r[0][0] - r[1][1] - r[2][2])) / 2, r[2][1] - r[1][2])
+    y = math.copysign(math.sqrt(max(0.0, 1 - r[0][0] + r[1][1] - r[2][2])) / 2, r[0][2] - r[2][0])
+    z = math.copysign(math.sqrt(max(0.0, 1 - r[0][0] - r[1][1] + r[2][2])) / 2, r[1][0] - r[0][1])
+    return (x, y, z, w)
+
+
+def rotate(r, v):
+    return tuple(dot(row, v) for row in r)
+
+
+def view_weapon(m, muzzle, reference):
+    """The first-person weapon, with an idle and a fire animation. Joint 0
+    moves the weapon, joint 1 (at the muzzle) scales the flash.
+
+    LibreQuake's weapons sit centred below the eye and turn about it as
+    they kick. RAVAGE's are held elsewhere, so each frame's kick is moved
+    to turn about the grip instead: the grip follows the back of the
+    LibreQuake weapon, scaled to the two weapons' lengths, and the weapon
+    tilts by the same angle."""
+    view = m.moved(VIEW_OFFSET, VIEW_SCALE)
+    muzzle = tuple(p * VIEW_SCALE + o for p, o in zip(muzzle, VIEW_OFFSET))
+    lo, hi = reference['bounds']
+    back = (lo[0], (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)
+    view_lo, view_hi = view.bounds()
+    size = (view_hi[0] - view_lo[0]) / (hi[0] - lo[0])
+    joints = [('weapon', -1, (0, 0, 0, 0, 0, 0, 1, 1, 1, 1)),
+              ('flash', 0, muzzle + (0, 0, 0, 1, 1, 1, 1))]
+    # LibreQuake's first frame is the weapon at rest, the rest are firing.
+    frames = []
+    for f in reference['frames']:
+        r = f['rotation']
+        kick = sub(tuple(a + b for a, b in zip(rotate(r, back), f['move'])), back)
+        kick = tuple(k * size for k in kick)
+        move = tuple(g + k - x for g, k, x in zip(VIEW_OFFSET, kick, rotate(r, VIEW_OFFSET)))
+        frames.append([move + quaternion(r) + (1, 1, 1),
+                       muzzle + (0, 0, 0, 1) + (f['flash'],) * 3])
+    rate = LIBREQUAKE['framerate']
+    anims = [('idle', 0, 1, rate, True), ('fire', 1, len(frames) - 1, rate, False)]
+    return view, joints, anims, frames
+
+
+LIBREQUAKE = None
 
 
 def medkit(scale):
@@ -421,13 +597,19 @@ def grenade():
 
 
 def models():
-    out = {'player': player()}
+    """Every model, as name: (mesh, skeleton); skeleton is None or
+    (joints, anims, frames)."""
+    global LIBREQUAKE
+    with open(LIBREQUAKE_WEAPONS) as f:
+        LIBREQUAKE = json.load(f)
+    out = {}
     for name, build in WEAPONS.items():
         m = Mesh()
-        build(m)
-        out['g_' + name] = m.moved(WORLD_OFFSET)
-        out['v_' + name] = m.moved(VIEW_OFFSET, VIEW_SCALE)
-    out.update({
+        muzzle = build(m)
+        out['g_' + name] = (m.part(0).moved(WORLD_OFFSET), None)
+        view, joints, anims, frames = view_weapon(m, muzzle, LIBREQUAKE['weapons'][name])
+        out['v_' + name] = (view, (joints, anims, frames))
+    static = {
         'health_small': health_small(),
         'health': medkit(1.0),
         'health_large': medkit(1.3),
@@ -444,7 +626,8 @@ def models():
         'ammo_slugs': ammo_box('green_glow'),
         'rocket': rocket(),
         'grenade': grenade(),
-    })
+    }
+    out.update((name, (mesh, None)) for name, mesh in static.items())
     return out
 
 
@@ -453,9 +636,17 @@ def main():
     out = os.path.join(content, 'models')
     os.makedirs(out, exist_ok=True)
     write_skins(out)
-    for name, mesh in models().items():
-        write_iqm(os.path.join(out, name + '.iqm'), mesh, name)
-    print('wrote', len(models()), 'models and their skin to', os.path.normpath(out))
+    built = models()
+    for name, (mesh, skeleton) in built.items():
+        path = os.path.join(out, name + '.iqm')
+        if skeleton:
+            # Each vertex follows one joint.
+            joints, anims, frames = skeleton
+            blend = [((j, 0, 0, 0), (255, 0, 0, 0)) for j in mesh.joints]
+            write_iqm(path, name, mesh.verts, mesh.tris, blend=blend, joints=joints, anims=anims, frames=frames)
+        else:
+            write_iqm(path, name, mesh.verts, mesh.tris)
+    print('wrote', len(built), 'models and their skin to', os.path.normpath(out))
 
 
 if __name__ == '__main__':

@@ -5727,7 +5727,9 @@ static void CL_UserinfoChanged(void *ctx, const char *keyname)
 
 
 void CL_Skygroup_f(void);
+#ifdef PACKAGE_TEXWAD
 void WAD_ImageList_f(void);
+#endif
 /*
 =================
 CL_Init
@@ -6107,7 +6109,9 @@ void CL_Init (void)
 	Cmd_AddCommandD ("waterfog", CL_Fog_f, "waterfog <density> <red> <green> <blue> <alpha> <depthbias>");
 	Cmd_AddCommandD ("skyroomfog", CL_Fog_f, "skyroomfog <density> <red> <green> <blue> <alpha> <depthbias>");
 	Cmd_AddCommandD ("skygroup", CL_Skygroup_f, "Provides a way to associate a skybox name with a series of maps, so that the requested skybox will override on a per-map basis.");
+#ifdef PACKAGE_TEXWAD
 	Cmd_AddCommandD ("r_imagelist_wad", WAD_ImageList_f, "displays the available wad images.");
+#endif
 //
 //  Windows commands
 //

@@ -7676,7 +7676,9 @@ void CSQC_Shutdown(void)
 	}
 	else
 	{
+#ifdef ENGINE_ROUTING
 		PR_Route_Shutdown (&csqc_world);
+#endif
 		World_Destroy(&csqc_world);
 	}
 

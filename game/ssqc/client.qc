@@ -93,6 +93,7 @@ void() PutClientInServer =
 	self.weapon = WEP_MACHINEGUN;
 	W_UpdateCurrentAmmo();
 
+	setmodel(self, MDL_PLAYER);
 	setsize(self, VEC_HULL_MIN, VEC_HULL_MAX);
 	setorigin(self, spot.origin + '0 0 1');
 	self.rv_spawn_origin = self.origin;

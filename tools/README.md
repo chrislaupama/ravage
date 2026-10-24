@@ -6,9 +6,11 @@ Development utilities: asset processing, profiling and build tooling.
 |---|---|
 | `build-win64-deps.sh` | Cross-compiles the Windows build's libraries with MinGW-w64 |
 | `fetch-ericw-tools.sh` | Downloads the pinned ericw-tools release (qbsp, vis, light) |
-| `build-game-data.sh` | Compiles the server game code and every map into `build/game/base` |
-| `bench-map.sh` | Rendering benchmark for a map, also run in CI |
+| `build-game-data.sh` | Compiles the server and client game code and every map, and copies models and sounds, into `build/game/base` |
+| `bench-map.sh` | Rendering and whole-frame benchmark for a map, also run in CI |
 | `textures/make_textures.py` | Generates the RAVAGE palette and graybox texture WAD |
+| `assets/make_models.py` | Generates the placeholder models and their skin |
+| `assets/make_sounds.py` | Generates the placeholder sounds |
 | `trenchbroom/RAVAGE/` | TrenchBroom game config, entity definitions and compile profile |
 
 See [docs/mapping.md](../docs/mapping.md).

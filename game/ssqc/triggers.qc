@@ -40,6 +40,8 @@ void() Push_Touch =
 	else
 		other.velocity = self.movedir * self.speed;
 	other.flags = other.flags - (other.flags & FL_ONGROUND);
+	// Touch runs every frame while inside the pad; play the sound once.
+	sound(other, CHAN_BODY, "misc/jumppad.wav", 1, ATTN_NORM, 0, SOUNDFLAG_NOREPLACE);
 };
 
 void() Push_FindTarget =
@@ -91,8 +93,10 @@ void() Teleport_Touch =
 		print("trigger_teleport at ", vtos(self.absmin), " has no destination\n");
 		return;
 	}
+	sound(other, CHAN_AUTO, "misc/teleport.wav", 1, ATTN_NORM);
 	makevectors(dest.angles);
 	setorigin(other, dest.origin + '0 0 1');
+	sound(other, CHAN_AUTO, "misc/teleport.wav", 1, ATTN_NORM);
 	other.angles = dest.angles;
 	other.fixangle = TRUE;
 	other.velocity = v_forward * 300;

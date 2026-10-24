@@ -3,6 +3,7 @@
 # server on duel_graybox, connect two real headless clients ("runner" holds
 # forward, "target" stands still), and let the game code's match test check
 # spawns, collision, pickups, combat and respawn (game/ssqc/matchtest.qc).
+# Finally the target's client prints the stats its HUD shows.
 #
 #   tests/match.sh <bin-dir>
 #
@@ -66,6 +67,14 @@ if [ "$status" -ne 0 ]; then
 fi
 if ! printf '%s\n' "$results" | grep -q "RAVAGE matchtest: PASS"; then
 	echo "FAIL match test did not pass"
+	fail=1
+fi
+# The client HUD reads stats the server sends; after respawning, the target
+# has full health, no armor and the machine gun with 100 bullets.
+hud=$(grep -a "RAVAGE hudtest:" "$base/target.log" || true)
+printf '%s\n' "${hud:-RAVAGE hudtest: no output}"
+if [ "$hud" != "RAVAGE hudtest: health=100 armor=0 weapon=2 ammo=100" ]; then
+	echo "FAIL client HUD stats are wrong"
 	fail=1
 fi
 if [ "$fail" -ne 0 ]; then

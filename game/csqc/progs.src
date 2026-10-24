@@ -1,0 +1,9 @@
+csprogs.dat
+
+engine_defs.qc
+defs.qc
+../shared/weapons.qc
+../shared/stats.qc
+view.qc
+hud.qc
+main.qc

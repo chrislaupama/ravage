@@ -28,7 +28,10 @@ void(entity targ, entity attacker) Combat_Killed =
 	targ.view_ofs = '0 0 -8';
 	targ.velocity_z = targ.velocity_z + 200;
 	targ.weaponmodel = "";
+	targ.angles_x = 0;
+	targ.angles_z = 80;		// placeholder death pose: fall over sideways
 	targ.rv_respawn_time = time + 1;
+	sound(targ, CHAN_VOICE, "player/death.wav", 1, ATTN_NORM);
 	setsize(targ, '-16 -16 -24', '16 16 -8');
 	Rules_Frag(attacker, targ);
 };
@@ -64,6 +67,8 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 
 	if (targ.health <= 0)
 		Combat_Killed(targ, attacker);
+	else if (targ.classname == "player")
+		sound(targ, CHAN_VOICE, "player/pain.wav", 1, ATTN_NORM, 0, SOUNDFLAG_NOREPLACE);
 };
 
 // Damage everything within radius of the inflictor, falling off linearly

@@ -23,7 +23,9 @@ fi
 base=$(mktemp -d)
 pids=
 cleanup() {
-	for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+	# The clients run until this script ends. They ignore SIGTERM, so stop
+	# them with SIGKILL.
+	for pid in $pids; do kill -KILL "$pid" 2>/dev/null || true; done
 	rm -rf "$base"
 }
 trap cleanup EXIT
@@ -41,7 +43,7 @@ server=$!
 client() { # name extra-commands...
 	name=$1
 	shift
-	timeout 90 "$bin/ravage" -basedir "$base" -nohome +set vid_renderer headless \
+	"$bin/ravage" -basedir "$base" -nohome +set vid_renderer headless \
 		+set s_device none +set sys_colorconsole 0 +set name "$name" \
 		+connect "127.0.0.1:$port" "$@" > "$base/$name.log" 2>&1 </dev/null &
 	pids="$pids $!"

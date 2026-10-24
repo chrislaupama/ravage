@@ -11,6 +11,9 @@
 *.bsp binary
 *.pk3 binary
 *.pak binary
+*.wad binary
+*.lmp binary
+*.dat binary
 
 # Keep imported upstream code byte-for-byte as upstream has it
 engine/fteqw/** -text

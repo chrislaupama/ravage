@@ -27,13 +27,29 @@ jobs:
       - name: Build
         run: cmake --build build --target ravage-all
 
+      - uses: actions/cache@v4
+        with:
+          path: deps/ericw-tools
+          key: ericw-tools-linux-${{ hashFiles('tools/fetch-ericw-tools.sh') }}
+
+      - name: Fetch map tools
+        run: tools/fetch-ericw-tools.sh
+
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: Build game data
+        run: cmake --build build --target game-data
 
       - uses: actions/upload-artifact@v4
         with:
           name: ravage-linux-x86_64
           path: build/bin/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ravage-game-data
+          path: build/game/
 
   windows:
     runs-on: ubuntu-24.04
@@ -95,3 +111,14 @@ jobs:
 
       - name: Test
         run: tests/smoke.sh bin
+
+      - uses: actions/cache@v4
+        with:
+          path: deps/ericw-tools
+          key: ericw-tools-windows-${{ hashFiles('tools/fetch-ericw-tools.sh') }}
+
+      - name: Fetch map tools
+        run: tools/fetch-ericw-tools.sh
+
+      - name: Map pipeline test
+        run: tests/map_pipeline.sh bin

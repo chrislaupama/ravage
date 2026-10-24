@@ -23,3 +23,6 @@ id1/
 pak*.pak
 build-*/
 deps/
+
+# Written by the engine into its working directory
+conhistory.txt

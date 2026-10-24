@@ -115,9 +115,10 @@ void AHash_Cleanup(ahashtable_t *table)
 int cvar_watched;
 
 //cvar_t	*cvar_vars;
-static char	*cvar_null_string = "";
-static char *cvar_zero_string = "0";
-static char *cvar_one_string = "1";
+//arrays, not pointers to literals: Cvar_DefaultFree compares addresses, and identical literals are not guaranteed to share one (they don't with MinGW and LTO).
+static char	cvar_null_string[] = "";
+static char cvar_zero_string[] = "0";
+static char cvar_one_string[] = "1";
 
 static char *Cvar_DefaultAlloc(char *str)
 {

@@ -1,8 +1,9 @@
 #!/bin/sh
 # Rendering benchmark: load a map in the client, then render a full 360
 # degree turn from the first spawn point with "timerefresh" and report the
-# frame rate. Run it on a machine with a GPU; numbers from software
-# rendering (for example Xvfb with llvmpipe) only show that it works.
+# frame rate. Without a GPU it runs with software rendering (for example
+# Xvfb with Mesa llvmpipe), which is CPU-bound but steady enough to catch
+# regressions; CI runs it that way.
 #
 #   tools/bench-map.sh [map] [frames] [width] [height]
 #

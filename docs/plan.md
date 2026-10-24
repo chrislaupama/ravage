@@ -8,7 +8,7 @@ The near-term goal is a standalone first milestone: a TrenchBroom-built graybox 
 4. **Map pipeline.** In review. TrenchBroom becomes the official editor, with a RAVAGE `GameConfig.cfg` and FGD entity definitions. Maps in standard Quake or Valve 220 `.map` format are compiled automatically with ericw-tools (`qbsp`, `vis`, `light`). This step also adds one original graybox Duel arena and an integration test that compiles it as BSP2 and loads it. See [mapping.md](mapping.md).
 5. **Standalone game and first milestone.** RAVAGE game code (QuakeC) with spawn points, weapon pickups, health, armor and other multiplayer entities. GPL-licensed QuakeWorld movement, combat and weapon logic is kept or adapted where it fits. Original or appropriately licensed placeholder player and weapon models, sounds and textures are added so the game runs standalone. The step ends with an automated test that compiles the arena, loads it on a headless dedicated server, and checks spawn points, pickups, collision and two connected clients.
 
-Rendering benchmarks and visual checks need a machine with a GPU, so they run on a developer's computer rather than in CI.
+Rendering benchmarks run in CI with software rendering (see [mapping.md](mapping.md#benchmark)) to catch regressions.
 
 ## Engine requirements
 

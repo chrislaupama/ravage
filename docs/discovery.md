@@ -108,7 +108,7 @@ Its performance features, with a first estimate of how much they would help RAVA
 
 FTEQW and Ironwail don't share renderer code. FTEQW renders through its own batch and shader backend (`gl/gl_backend.c`, `vk/`), so any Ironwail technique would be re-written for that backend and done separately for Vulkan. That matches section 8.3 of the vision: no wholesale transplant.
 
-**Recommendation:** don't schedule Ironwail work yet. Build the graybox arena first, measure FTEQW's frame times against the 144 FPS at 1080p target on real hardware, and only port a technique if the profile shows the bottleneck it fixes. Benchmarks need a machine with a GPU, so they can't run on this cloud machine.
+**Recommendation:** don't schedule Ironwail work yet. Build the graybox arena first, measure FTEQW's frame times against the 144 FPS at 1080p target on real hardware, and only port a technique if the profile shows the bottleneck it fixes. **Update (step 4):** `tools/bench-map.sh` now benchmarks maps with software rendering in CI; see [mapping.md](mapping.md#benchmark).
 
 ## Licensing and dependencies
 

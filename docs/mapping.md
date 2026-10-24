@@ -15,7 +15,7 @@ RAVAGE maps are made in [TrenchBroom](https://trenchbroom.github.io/) and compil
 | `game/ssqc/` | Server game code, including a spawn function for every entity in the FGD |
 | `tools/fetch-ericw-tools.sh` | Downloads the pinned ericw-tools release (v0.18.1) into `deps/ericw-tools/` |
 | `tools/build-game-data.sh` | Compiles the game code and every map into `build/game/base/` |
-| `tools/bench-map.sh` | Rendering benchmark for a map, for machines with a GPU |
+| `tools/bench-map.sh` | Rendering benchmark for a map |
 
 ## One-time setup
 
@@ -97,4 +97,6 @@ light -bounce -extra4 <map>.bsp
 
 ## Benchmark
 
-`tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and renders full turns from the first spawn point with `timerefresh`, printing the frame rate. Run it on a machine with a GPU and compare before and after renderer or map changes. On this project's cloud machines it only runs with software rendering (about 18 fps at 1920x1080 for `duel_graybox`), which shows it works but says nothing about real performance.
+`tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and renders full turns from the first spawn point with `timerefresh`, printing the frame rate. Compare before and after renderer or map changes, over several runs.
+
+The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080.

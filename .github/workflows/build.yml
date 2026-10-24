@@ -41,6 +41,11 @@ jobs:
       - name: Build game data
         run: cmake --build build --target game-data
 
+      - name: Rendering benchmark (software rendering)
+        run: |
+          sudo apt-get -qq install --no-install-recommends xvfb libgl1-mesa-dri
+          xvfb-run -a -s "-screen 0 1280x720x24" tools/bench-map.sh duel_graybox 300 1280 720 | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ravage-linux-x86_64

@@ -10,12 +10,24 @@ base=$(mktemp -d)
 trap 'rm -rf "$base"' EXIT
 mkdir -p "$base/base"
 
+windows=false
+case $(uname -s) in
+MINGW*|MSYS*|CYGWIN*) windows=true ;;
+esac
+basedir=$base
+if $windows; then
+	# Windows programs need a Windows path, not an MSYS one.
+	basedir=$(cygpath -m "$base")
+fi
+
 fail=0
 check() {
 	name=$1
 	shift
-	if ! out=$("$@" 2>&1); then
-		echo "FAIL $name: exited with an error"
+	status=0
+	out=$("$@" 2>&1 </dev/null) || status=$?
+	if [ "$status" -ne 0 ]; then
+		echo "FAIL $name: exited with status $status"
 		echo "$out"
 		fail=1
 		return
@@ -32,12 +44,13 @@ check() {
 }
 
 # sys_colorconsole 0 keeps the Windows server writing plain text to stdout.
-check "ravage-sv" timeout 30 "$bin/ravage-sv" -basedir "$base" -nohome +set sys_colorconsole 0 +version +quit
+check "ravage-sv" timeout 30 "$bin/ravage-sv" -basedir "$basedir" -nohome +set sys_colorconsole 0 +version +quit
 # The Windows client is a GUI program with no console output to check.
-case $(uname -s) in
-MINGW*|MSYS*|CYGWIN*) echo "skip ravage (headless): no console output on Windows"; exit $fail ;;
-esac
-check "ravage (headless)" timeout 30 "$bin/ravage" -basedir "$base" -nohome \
+if $windows; then
+	echo "skip ravage (headless): no console output on Windows"
+	exit $fail
+fi
+check "ravage (headless)" timeout 30 "$bin/ravage" -basedir "$basedir" -nohome \
 	+set vid_renderer headless +set s_device none +version +quit
 
 exit $fail

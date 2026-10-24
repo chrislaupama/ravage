@@ -1,8 +1,14 @@
 qwprogs.dat
 
 engine_defs.qc
+defs.qc
 world.qc
 spawn.qc
+combat.qc
+weapons.qc
 items.qc
+triggers.qc
+rules.qc
 client.qc
 selftest.qc
+matchtest.qc

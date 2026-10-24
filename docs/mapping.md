@@ -71,7 +71,7 @@ Then play it with `build/bin/ravage -basedir build/game +map <name>`.
 | Lighting | `light` (compiler only) |
 | Brush entities | `func_detail`, `func_wall`, `func_illusionary`, `func_group` |
 
-The names follow the weapon archetypes in the [vision](vision.md#42-precision-combat) and will change once weapons get their final names. In this step, pickups and triggers only register themselves; picking things up, jump pads and teleporters work from step 5.
+The names follow the weapon archetypes in the [vision](vision.md#42-precision-combat) and will change once weapons get their final names. Picking things up, jump pads and teleporters all work. Pickups are invisible until their placeholder models land later in step 5.
 
 ## Textures and palette
 

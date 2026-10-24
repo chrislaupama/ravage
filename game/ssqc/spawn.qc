@@ -3,9 +3,6 @@
 	See tools/trenchbroom/RAVAGE/ravage.fgd for the editor definitions.
 */
 
-const vector VEC_HULL_MIN = '-16 -16 -24';
-const vector VEC_HULL_MAX = '16 16 32';
-
 void() info_player_deathmatch =
 {
 };

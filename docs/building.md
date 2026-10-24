@@ -40,7 +40,7 @@ Not yet included on Windows: Ogg Vorbis audio, JPEG and bzip2-compressed package
 
 ## Running
 
-There is no game content yet. The client starts to an empty console, and the server stops with "Couldn't load a map" until the first arena arrives in step 4. Game data lives in a `base/` folder next to the programs, or wherever `-basedir` points:
+There is no game content yet. The client starts to an empty console, and the server stops with "Couldn't load a map" until the first arena arrives in step 4. The programs look for game data in a `base/` folder inside the directory they're started from (the current working directory), not next to the executable. To use data somewhere else, point `-basedir` at the folder that contains `base/`:
 
 ```
 build/bin/ravage-sv -basedir /path/to/data

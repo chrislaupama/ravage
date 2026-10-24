@@ -85,5 +85,13 @@ jobs:
           name: ravage-windows-x86_64
           path: bin
 
+      - name: Start the server directly
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path data/base | Out-Null
+          & .\bin\ravage-sv.exe -basedir "$PWD\data" -nohome +set sys_colorconsole 0 +version +quit
+          "exit code: $LASTEXITCODE (0x{0:X8})" -f $LASTEXITCODE
+          exit 0  # the smoke test below decides pass or fail
+
       - name: Test
         run: tests/smoke.sh bin

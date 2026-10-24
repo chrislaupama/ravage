@@ -32,11 +32,6 @@ void(entity e, float wep, float value) W_SetAmmo =
 	}
 };
 
-float(float wep) W_ItemBit =
-{
-	return 1 << (wep - 1);
-};
-
 float(float wep) W_HasAmmo =
 {
 	return W_Ammo(self, wep) >= 1;
@@ -56,9 +51,13 @@ float(float wep) W_RefireTime =
 	}
 };
 
+// Refreshes the ammo counter and the first-person model after the weapon
+// or its ammo changed.
 void() W_UpdateCurrentAmmo =
 {
 	self.currentammo = W_Ammo(self, self.weapon);
+	if (!self.deadflag)
+		self.weaponmodel = W_ViewModel(self.weapon);
 };
 
 float(float wep) W_CanUse =
@@ -97,7 +96,7 @@ void() W_Impulse =
 		if (W_CanUse(self.impulse))
 			self.weapon = self.impulse;
 		else
-			sprint(self, PRINT_HIGH, "no weapon or no ammo\n");
+			sound(self, CHAN_ITEM, "weapons/noammo.wav", 1, ATTN_IDLE);
 	}
 	else if (self.impulse == 10 || self.impulse == 12)
 	{
@@ -142,6 +141,7 @@ void(float damage, float spread, float range) W_Hitscan =
 
 void() Missile_Explode =
 {
+	sound(self, CHAN_AUTO, "weapons/explode.wav", 1, ATTN_NORM);
 	T_RadiusDamage(self, self.owner, self.rv_splash_damage, self.rv_splash_radius, other);
 	te_explosion(self.origin);
 	remove(self);
@@ -174,13 +174,16 @@ void() Grenade_Touch =
 	}
 	if (self.velocity == '0 0 0')
 		self.avelocity = '0 0 0';
+	else
+		sound(self, CHAN_BODY, "weapons/bounce.wav", 1, ATTN_NORM);
 };
 
-entity(float speed) W_SpawnMissile =
+entity(float speed, string model_name) W_SpawnMissile =
 {
 	local entity missile;
 
 	missile = spawn();
+	setmodel(missile, model_name);
 	missile.owner = self;
 	missile.solid = SOLID_BBOX;
 	missile.velocity = v_forward * speed;
@@ -195,7 +198,7 @@ void() W_FireRocket =
 {
 	local entity missile;
 
-	missile = W_SpawnMissile(1000);
+	missile = W_SpawnMissile(1000, MDL_ROCKET);
 	missile.classname = "rocket";
 	missile.movetype = MOVETYPE_FLYMISSILE;
 	missile.dmg = 100;
@@ -210,7 +213,7 @@ void() W_FireGrenade =
 {
 	local entity missile;
 
-	missile = W_SpawnMissile(700);
+	missile = W_SpawnMissile(700, MDL_GRENADE);
 	missile.classname = "grenade";
 	missile.movetype = MOVETYPE_BOUNCE;
 	missile.velocity_z = missile.velocity_z + 200;
@@ -253,7 +256,13 @@ void(float wep) W_Fire =
 		return;
 	W_SetAmmo(self, wep, W_Ammo(self, wep) - 1);
 	self.attack_finished = time + W_RefireTime(wep);
+	self.rv_fire_time = time;
 	makevectors(self.v_angle);
+	// The lightning gun hums instead of restarting its sound every shot.
+	if (wep == WEP_LIGHTNING)
+		sound(self, CHAN_WEAPON, W_FireSound(wep), 1, ATTN_NORM, 0, SOUNDFLAG_NOREPLACE);
+	else
+		sound(self, CHAN_WEAPON, W_FireSound(wep), 1, ATTN_NORM);
 
 	switch (wep)
 	{

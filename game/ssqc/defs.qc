@@ -10,23 +10,6 @@ const vector VEC_HULL_MAX = '16 16 32';
 const vector VEC_ITEM_MIN = '-16 -16 0';
 const vector VEC_ITEM_MAX = '16 16 32';
 
-// Weapon numbers, also the impulse that selects each weapon.
-const float WEP_SHOTGUN = 1;
-const float WEP_MACHINEGUN = 2;
-const float WEP_ROCKET = 3;
-const float WEP_GRENADE = 4;
-const float WEP_LIGHTNING = 5;
-const float WEP_RAILGUN = 6;
-const float WEP_COUNT = 6;
-
-// Bits in .items for the weapons a player holds.
-const float IT_SHOTGUN = 1;
-const float IT_MACHINEGUN = 2;
-const float IT_ROCKET = 4;
-const float IT_GRENADE = 8;
-const float IT_LIGHTNING = 16;
-const float IT_RAILGUN = 32;
-
 // Ammo the engine does not already have a field for.
 .float ammo_bullets;
 .float ammo_grenades;
@@ -48,6 +31,7 @@ const float DEAD_DEAD = 2;
 
 // Player state.
 .float attack_finished;		// time the current weapon can fire again
+.float rv_fire_time;			// time of the last shot (STAT_RV_FIRE_TIME)
 .float rv_respawn_time;		// earliest time a dead player can respawn
 .float rv_mega_decay;		// next time health above 100 ticks down
 .float rv_spawn_index;		// spawn point the player last appeared at (selftest)

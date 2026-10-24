@@ -2,9 +2,9 @@
 	Map self-test, run a few frames after the map loads.
 
 	Checks that every spawn point has room for a player and stands on a
-	floor, and that every pickup rests on a floor. Prints a summary that
-	tests/map_pipeline.sh looks for. With "set rv_selftest 1" the server
-	quits after printing it.
+	floor, and that every pickup rests on a floor and has a model. Prints a
+	summary that tests/map_pipeline.sh looks for. With "set rv_selftest 1"
+	the server quits after printing it.
 */
 
 float rv_selftest_done;
@@ -54,6 +54,8 @@ void() SelfTest_Frame =
 			items = items + 1;
 			if (!SelfTest_OnFloor(e.origin + '0 0 8', 16))
 				SelfTest_Fail(e, "pickup is not resting on a floor");
+			if (!e.modelindex)
+				SelfTest_Fail(e, "pickup has no model");
 		}
 	}
 

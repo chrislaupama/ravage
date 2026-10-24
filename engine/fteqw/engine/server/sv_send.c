@@ -2038,6 +2038,14 @@ static void SV_QCStatEval(int type, const char *name, evalc_t *field, eval_t *gl
 	qcstats[i].type = type;
 	qcstats[i].statnum = statnum;
 	Q_strncpyz(qcstats[i].name, name, sizeof(qcstats[i].name));
+	//RAVAGE: send stats above MAX_QW_STATS too. Without QUAKESTATS nothing
+	//else raises the limit, so they were silently never sent.
+	{
+		int t = type<0?-type:type;
+		unsigned int end = statnum + ((t == ev_vector)?3:(t == ev_int64 || t == ev_uint64)?2:1);
+		if (end > highestqcstat)
+			highestqcstat = min(end, MAX_CL_STATS);
+	}
 	memset(&qcstats[i].eval, 0, sizeof(qcstats[i].eval));
 	if (type <= 0)
 		qcstats[i].eval.g = global;

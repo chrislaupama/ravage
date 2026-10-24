@@ -1,7 +1,10 @@
 qwprogs.dat
 
 engine_defs.qc
+../shared/weapons.qc
+../shared/stats.qc
 defs.qc
+assets.qc
 world.qc
 spawn.qc
 combat.qc

@@ -11,6 +11,8 @@
 	3. pickups:    the target picks up mega health and the rocket launcher
 	4. combat:     the runner's railgun shot kills the target and scores
 	5. respawn:    the target respawns at a deathmatch spawn point
+	6. hud:        the target's client HUD shows the respawn loadout (checked
+	               by tests/match.sh in the client's log)
 
 	Each check prints "RAVAGE matchtest: ok <name>" or "FAIL <name>: why".
 	The server quits when all checks have run.
@@ -197,6 +199,15 @@ void() MatchTest_Frame =
 			MatchTest_Fail("respawn", "target respawned away from a spawn point");
 		else
 			MatchTest_Ok("respawn");
+		// Have the target's client print what its HUD shows, which
+		// tests/match.sh checks against the respawn loadout.
+		stuffcmd(mt_target, "rv_hudtest\n");
+		MatchTest_Next(6);
+		return;
+
+	case 6:	// give the client a moment to answer
+		if (time - mt_phase_time < 1)
+			return;
 		MatchTest_Finish();
 		return;
 	}

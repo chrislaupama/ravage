@@ -71,7 +71,7 @@ Then play it with `build/bin/ravage -basedir build/game +map <name>`.
 | Lighting | `light` (compiler only) |
 | Brush entities | `func_detail`, `func_wall`, `func_illusionary`, `func_group` |
 
-The names follow the weapon archetypes in the [vision](vision.md#42-precision-combat) and will change once weapons get their final names. Picking things up, jump pads and teleporters all work. Pickups are invisible until their placeholder models land later in step 5.
+The names follow the weapon archetypes in the [vision](vision.md#42-precision-combat) and will change once weapons get their final names. Picking things up, jump pads and teleporters all work, and every pickup has a placeholder model in the game.
 
 ## Textures and palette
 
@@ -93,10 +93,15 @@ light -bounce -extra4 <map>.bsp
 
 ## Tests
 
-`tests/map_pipeline.sh` (run by `ctest`) checks that every FGD entity has a spawn function, compiles all maps, checks each is BSP2, then loads each on the dedicated server. A self-test in the game code (`game/ssqc/selftest.qc`) checks that every spawn point has room for a player and a floor under it, and that every pickup rests on a floor. On Windows CI the same test runs with the Windows builds of the engine and ericw-tools.
+`tests/map_pipeline.sh` (run by `ctest`) checks that every FGD entity has a spawn function, compiles all maps, checks each is BSP2, then loads each on the dedicated server. A self-test in the game code (`game/ssqc/selftest.qc`) checks that every spawn point has room for a player and a floor under it, and that every pickup rests on a floor and has a model. On Windows CI the same test runs with the Windows builds of the engine and ericw-tools.
 
 ## Benchmark
 
-`tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and renders full turns from the first spawn point with `timerefresh`, printing the frame rate. Compare before and after renderer or map changes, over several runs.
+`tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and turns the view a full circle from the first spawn point, three times with each of two measurements, printing the frame rate:
 
-The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080.
+- `timerefresh` times the engine drawing the 3D view alone.
+- `framebench` (the game's `rv_framebench` command) times whole frames, including the HUD, the first-person weapon and the client game code.
+
+Compare before and after renderer, map or HUD changes, over several runs.
+
+The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080 with `timerefresh`, and about 70 fps at 1280x720 with `framebench`.

@@ -1,7 +1,8 @@
 #!/bin/sh
-# Rendering benchmark: load a map in the client, then render a full 360
-# degree turn from the first spawn point with "timerefresh" and report the
-# frame rate. Without a GPU it runs with software rendering (for example
+# Rendering benchmark: load a map in the client, then turn the view a full
+# 360 degrees from the first spawn point and report the frame rate, three
+# times each with the engine's "timerefresh" (3D view only) and the game's
+# "rv_framebench" (whole frames, including the HUD and first-person weapon). Without a GPU it runs with software rendering (for example
 # Xvfb with Mesa llvmpipe), which is CPU-bound but steady enough to catch
 # regressions; CI runs it that way.
 #
@@ -26,13 +27,26 @@ trap 'rm -f "$cfg"' EXIT
 	i=0; while [ $i -lt 30 ]; do echo wait; i=$((i + 1)); done
 	echo "map $map"
 	i=0; while [ $i -lt 120 ]; do echo wait; i=$((i + 1)); done
+	# The Xvfb window never has focus, and unfocused clients are capped at
+	# cl_idlefps (60). Lift the cap only now: the waits above count frames,
+	# and at an uncapped rate they would pass before the map has loaded.
+	echo "cl_idlefps 0"
 	echo "timerefresh 1 $frames"
 	echo "timerefresh 1 $frames"
 	echo "timerefresh 1 $frames"
+	# Whole frames, including the HUD and first-person weapon. Each run
+	# must start on a fresh frame and finish before the next starts, hence
+	# the waits around it.
+	for run in 1 2 3; do
+		echo wait
+		echo "rv_framebench $frames"
+		i=0; while [ $i -lt $((frames + 20)) ]; do echo wait; i=$((i + 1)); done
+	done
 	echo quit
 } > "$cfg"
 
 "$client" -basedir "$game" -nohome +set vid_fullscreen 0 +set vid_width "$width" \
-	+set vid_height "$height" +set vid_vsync 0 +set s_device none \
+	+set vid_height "$height" +set vid_vsync 0 +set cl_maxfps 0 +set s_device none \
 	+set sys_colorconsole 0 +set crosshair 0 +exec bench.cfg 2>&1 </dev/null |
-	grep -E "GL_RENDERER|seconds \(" | sed "s/^/$map ${width}x$height: /"
+	grep -E "GL_RENDERER|seconds \(" | sed -e "s/^RAVAGE framebench: /framebench /" -e "s/^\([0-9]\)/timerefresh \1/" \
+		-e "s/^/$map ${width}x$height: /"

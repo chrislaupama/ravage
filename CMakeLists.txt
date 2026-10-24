@@ -70,3 +70,5 @@ set_tests_properties(map_pipeline PROPERTIES SKIP_RETURN_CODE 77)
 add_test(NAME match
 	COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/match.sh" "${CMAKE_BINARY_DIR}/bin")
 set_tests_properties(match PROPERTIES SKIP_RETURN_CODE 77)
+add_test(NAME assets
+	COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/assets.sh")

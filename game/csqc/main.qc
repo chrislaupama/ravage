@@ -33,6 +33,15 @@ void(float vwidth, float vheight, float notmenu) CSQC_UpdateView =
 	Hud_Draw([vwidth, vheight]);
 };
 
+// F3 readies up (or back down) during warmup, like typing "ready".
+float(float evtype, float scanx, float chary, float devid) CSQC_InputEvent =
+{
+	if (evtype != IE_KEYDOWN || scanx != K_F3 || getstatf(STAT_RV_MATCH_STATE) > MATCH_COUNTDOWN)
+		return FALSE;
+	localcmd(getstatf(STAT_RV_READY) ? "cmd notready\n" : "cmd ready\n");
+	return TRUE;
+};
+
 // Declared __used by the engine definitions, so it needs a body. Input is
 // left as the engine sends it.
 void() CSQC_Input_Frame =

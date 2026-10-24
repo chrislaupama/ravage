@@ -48,6 +48,13 @@ float rv_taken;				// set by rv_give when the pickup was used
 .float rv_splash_radius;
 
 // Match rules.
+float rv_match_state;		// MATCH_ state (STAT_RV_MATCH_STATE)
+float rv_match_time;		// time the countdown or match clock runs out, 0 for none
+float rv_match_start;		// time the match started
+float rv_ready_count;		// players ready, during warmup
+float rv_players;			// players in the game
+var float autocvar_rv_warmup = 1;	// 0 skips warmup: the match starts with the map
+.float rv_ready;			// readied up during warmup
 float rv_intermission;		// time the match ended, 0 while playing
 float rv_intermission_exit;	// time players may leave the scoreboard
 entity rv_intermission_spot;

@@ -5,14 +5,18 @@
 	connect: "target" stands still and "runner" holds +forward. Once both
 	are in, the test checks, in order:
 
-	1. spawns:     both players spawned at different deathmatch spawn points
-	2. collision:  the runner moved, and no player ever ended up inside
+	1. ready-up:   in warmup, both players type "ready"; after the countdown
+	               the match starts with frags reset
+	2. spawns:     both players spawned at different deathmatch spawn points
+	3. collision:  the runner moved, and no player ever ended up inside
 	               the world or outside the arena
-	3. pickups:    the target picks up mega health and the rocket launcher
-	4. combat:     the runner's railgun shot kills the target and scores
-	5. respawn:    the target respawns at a deathmatch spawn point
-	6. hud:        the target's client HUD shows the respawn loadout (checked
+	4. pickups:    the target picks up mega health and the rocket launcher
+	5. combat:     the runner's railgun shot kills the target and scores
+	6. respawn:    the target respawns at a deathmatch spawn point
+	7. hud:        the target's client HUD shows the respawn loadout (checked
 	               by tests/match.sh in the client's log)
+	8. overtime:   with time up and the scores tied the match goes to
+	               overtime, and the next frag ends it
 
 	Each check prints "RAVAGE matchtest: ok <name>" or "FAIL <name>: why".
 	The server quits when all checks have run.
@@ -115,11 +119,35 @@ void() MatchTest_Frame =
 
 	switch (mt_phase)
 	{
-	case 0:	// wait for both clients
+	case 0:	// wait for both clients, then have them ready up
 		mt_runner = MatchTest_FindPlayer("runner");
 		mt_target = MatchTest_FindPlayer("target");
 		if (!mt_runner || !mt_target)
 			return;
+		if (rv_match_state != MATCH_WARMUP)
+		{
+			MatchTest_Fail("ready-up", "the match did not start in warmup");
+			MatchTest_Finish();
+			return;
+		}
+		// A warmup frag, which the match start must clear.
+		mt_runner.frags = 3;
+		stuffcmd(mt_runner, "cmd ready\n");
+		stuffcmd(mt_target, "cmd ready\n");
+		MatchTest_Next(10);
+		return;
+
+	case 10:	// countdown, then the match
+		if (rv_match_state != MATCH_PLAYING)
+			return;
+		if (time - mt_phase_time < MATCH_COUNTDOWN_TIME)
+			MatchTest_Fail("ready-up", "the match started before the countdown ended");
+		else if (mt_runner.frags != 0)
+			MatchTest_Fail("ready-up", "frags were not reset at the match start");
+		else
+			MatchTest_Ok("ready-up");
+		mt_runner = MatchTest_FindPlayer("runner");
+		mt_target = MatchTest_FindPlayer("target");
 		if (!mt_runner.rv_spawn_index || !mt_target.rv_spawn_index)
 			MatchTest_Fail("spawns", "a player did not use an info_player_deathmatch");
 		else if (mt_runner.rv_spawn_index == mt_target.rv_spawn_index)
@@ -208,6 +236,28 @@ void() MatchTest_Frame =
 	case 6:	// give the client a moment to answer
 		if (time - mt_phase_time < 1)
 			return;
+		// Run the clock out with the scores tied.
+		mt_target.frags = mt_runner.frags;
+		rv_match_time = time;
+		MatchTest_Next(7);
+		return;
+
+	case 7:	// overtime, ended by the next frag
+		if (rv_match_state != MATCH_OVERTIME)
+		{
+			MatchTest_Fail("overtime", strcat("match state is ", ftos(rv_match_state), " with the scores tied"));
+			MatchTest_Finish();
+			return;
+		}
+		Rules_Frag(mt_runner, mt_target);
+		MatchTest_Next(8);
+		return;
+
+	case 8:
+		if (rv_match_state != MATCH_OVER)
+			MatchTest_Fail("overtime", "the match did not end on the overtime frag");
+		else
+			MatchTest_Ok("overtime");
 		MatchTest_Finish();
 		return;
 	}

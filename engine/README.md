@@ -15,6 +15,7 @@ Keep this list current, so local changes can be carried forward or sent upstream
 |---|---|---|
 | `fteqw/engine/client/pr_csqc.c` | Guard `PR_Route_Shutdown` with `ENGINE_ROUTING` | Linking failed when `ENGINE_ROUTING` is off |
 | `fteqw/engine/client/cl_main.c` | Guard `r_imagelist_wad` with `PACKAGE_TEXWAD` | Linking failed when `PACKAGE_TEXWAD` is off |
+| `fteqw/CMakeLists.txt` | Add `FTE_MARCH_NATIVE` option around `-march=native` | Release builds crashed with an illegal instruction on CPUs older than the build machine's |
 
 ## Updating FTEQW
 

@@ -306,7 +306,9 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU")
 #	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wswitch-enum")					#to warn about omitted enums despite default.
 
 	#might as well do this, public builds use the regular Makefile.
-	IF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64")
+	SET(FTE_MARCH_NATIVE true CACHE BOOL "Optimise for the build machine's CPU. Turn off for binaries that run on other machines.")
+	IF(NOT FTE_MARCH_NATIVE)
+	ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64")
 		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=native")
 	ELSE()
 		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")

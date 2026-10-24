@@ -36,6 +36,9 @@ foreach(opt
 	set(${opt} false CACHE BOOL "Disabled by RAVAGE")
 endforeach()
 
+# Builds must run on any x86-64 machine, not just the one that compiled them.
+set(FTE_MARCH_NATIVE false CACHE BOOL "Optimise for the build machine's CPU")
+
 add_subdirectory(engine/fteqw)
 
 set_target_properties(fteqw PROPERTIES

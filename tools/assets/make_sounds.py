@@ -2,10 +2,11 @@
 """Generate RAVAGE's placeholder sounds.
 
 Writes 16-bit mono WAV files into content/sound: weapon fire, explosions,
-pickups, pain, death, teleporters and jump pads. Every sound is
-synthesised here from sine, saw and noise generators, so they contain no
-recorded or third-party audio. They are placeholders until real sound
-design replaces them.
+pain, death and jump pads. Every sound is synthesised here from sine, saw
+and noise generators, so they contain no recorded or third-party audio.
+They are placeholders until real sound design replaces them. Pickup,
+grenade and teleporter sounds come from LibreQuake instead; see
+import_librequake_sounds.py.
 
 Usage: make_sounds.py [content-dir]    (default: the repository's content/)
 
@@ -81,15 +82,6 @@ def burst(seed, seconds, rate, tone=1.0):
     return lowpass([noise() * decay(i / RATE, rate) for i in samples(seconds)], tone)
 
 
-def chime(freqs, step, length, rate=8):
-    parts = []
-    for k, f in enumerate(freqs):
-        tone = [math.sin(2 * math.pi * f * t) * decay(t, rate) * 0.5
-                for t in (i / RATE for i in samples(length))]
-        parts.append(delay(tone, k * step))
-    return mix(*parts)
-
-
 #
 # The sounds
 #
@@ -110,11 +102,6 @@ def rocketlauncher():
                       for i in samples(0.6)], 0.15)
     boom = [v * decay(t, 9) * 0.6 for t, v in sweep(110, 50, 0.4)]
     return mix([x * 2.5 for x in whoosh], boom)
-
-
-def grenadelauncher():
-    thunk = [v * decay(t, 18) for t, v in sweep(160, 70, 0.25)]
-    return mix(thunk, burst(4, 0.15, 30, 0.3))
 
 
 def lightning():
@@ -138,40 +125,9 @@ def explode():
     return mix([x * 1.6 for x in burst(7, 1.0, 4, 0.12)], rumble)
 
 
-def bounce():
-    return [v * decay(t, 60) * 0.7 for t, v in sweep(900, 500, 0.06)]
-
-
 def noammo():
     click = burst(8, 0.03, 120, 0.8)
     return mix(click, delay(click, 0.08))
-
-
-def pickup_weapon():
-    clack = burst(9, 0.05, 80, 0.7)
-    return mix(clack, delay(clack, 0.12), delay(chime([880], 0, 0.3, 14), 0.12))
-
-
-def pickup_ammo():
-    return mix(burst(10, 0.04, 90, 0.7), chime([620], 0, 0.2, 18))
-
-
-def pickup_health():
-    return chime([660, 990], 0.08, 0.35)
-
-
-def pickup_mega():
-    return chime([523, 659, 784, 1047], 0.07, 0.6, 5)
-
-
-def pickup_armor():
-    clang = [sum(math.sin(2 * math.pi * f * t) / (k + 1) for k, f in enumerate((220, 551, 873)))
-             * 0.5 * decay(t, 7) for t in (i / RATE for i in samples(0.5))]
-    return mix(clang, burst(11, 0.05, 60, 0.6))
-
-
-def respawn():
-    return [v * 0.3 * math.sin(math.pi * t / 0.5) for t, v in sweep(400, 1400, 0.5)]
 
 
 def pain():
@@ -183,13 +139,6 @@ def death():
     return lowpass([v * 0.7 * decay(t, 2.5) for t, v in sweep(220, 55, 0.8, saw)], 0.3)
 
 
-def teleport():
-    noise = Noise(12)
-    shimmer = [v * 0.4 * math.sin(math.pi * t / 0.6) for t, v in sweep(1500, 200, 0.6)]
-    hiss = [noise() * 0.15 * decay(i / RATE, 5) for i in samples(0.6)]
-    return mix(shimmer, hiss)
-
-
 def jumppad():
     return [v * 0.6 * decay(t, 6) for t, v in sweep(180, 620, 0.35)]
 
@@ -198,21 +147,12 @@ SOUNDS = {
     'weapons/shotgun.wav': shotgun,
     'weapons/machinegun.wav': machinegun,
     'weapons/rocketlauncher.wav': rocketlauncher,
-    'weapons/grenadelauncher.wav': grenadelauncher,
     'weapons/lightning.wav': lightning,
     'weapons/railgun.wav': railgun,
     'weapons/explode.wav': explode,
-    'weapons/bounce.wav': bounce,
     'weapons/noammo.wav': noammo,
-    'items/weapon.wav': pickup_weapon,
-    'items/ammo.wav': pickup_ammo,
-    'items/health.wav': pickup_health,
-    'items/mega.wav': pickup_mega,
-    'items/armor.wav': pickup_armor,
-    'items/respawn.wav': respawn,
     'player/pain.wav': pain,
     'player/death.wav': death,
-    'misc/teleport.wav': teleport,
     'misc/jumppad.wav': jumppad,
 }
 

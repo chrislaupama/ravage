@@ -1,0 +1,23 @@
+# Build output
+build/
+out/
+bin/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.pdb
+*.dSYM/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Quake commercial assets must never be committed
+id1/
+pak*.pak

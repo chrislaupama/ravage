@@ -1,0 +1,8 @@
+qwprogs.dat
+
+engine_defs.qc
+world.qc
+spawn.qc
+items.qc
+client.qc
+selftest.qc

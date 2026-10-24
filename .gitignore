@@ -26,3 +26,13 @@ deps/
 
 # Written by the engine into its working directory
 conhistory.txt
+
+# Files TrenchBroom and the map compilers leave next to a map
+content/maps/*.bsp
+content/maps/*.lit
+content/maps/*.prt
+content/maps/*.pts
+content/maps/*.lin
+content/maps/*.log
+content/maps/*-compile.map
+content/maps/autosave/

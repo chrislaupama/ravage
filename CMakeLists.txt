@@ -5,6 +5,7 @@
 #
 #   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build --target ravage-all
+#   cmake --build build --target game-data    (game code and maps)
 
 cmake_minimum_required(VERSION 3.16)
 project(RAVAGE C CXX)
@@ -52,6 +53,17 @@ set_target_properties(fteqcc PROPERTIES
 
 add_custom_target(ravage-all DEPENDS fteqw fteqw-sv fteqcc)
 
+# Game data (server game code and compiled maps) in build/game/base. Needs
+# ericw-tools, see tools/fetch-ericw-tools.sh.
+add_custom_target(game-data
+	COMMAND ${CMAKE_COMMAND} -E env "FTEQCC=$<TARGET_FILE:fteqcc>"
+		"${CMAKE_CURRENT_SOURCE_DIR}/tools/build-game-data.sh" "${CMAKE_BINARY_DIR}/game/base"
+	DEPENDS fteqcc
+	USES_TERMINAL)
+
 enable_testing()
 add_test(NAME smoke
 	COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke.sh" "${CMAKE_BINARY_DIR}/bin")
+add_test(NAME map_pipeline
+	COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/map_pipeline.sh" "${CMAKE_BINARY_DIR}/bin")
+set_tests_properties(map_pipeline PROPERTIES SKIP_RETURN_CODE 77)

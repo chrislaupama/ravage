@@ -1,0 +1,135 @@
+//
+// RAVAGE entity definitions for TrenchBroom.
+//
+// Every class here has a spawn function in game/ssqc. Sizes are in Quake
+// units. Pickups have no models yet, so the editor shows coloured boxes.
+// Pickup and trigger behaviour is added in step 5 of docs/plan.md.
+//
+
+//
+// World
+//
+
+@SolidClass = worldspawn : "World entity"
+[
+	message(string) : "Map title"
+	wad(string) : "Texture WADs, relative to the map file" : "../textures/ravage.wad"
+	light(integer) : "Minimum light level everywhere" : 24
+	_bounce(choices) : "Bounced lighting" : 1 =
+	[
+		0 : "Off"
+		1 : "On"
+	]
+	_sunlight(integer) : "Sunlight brightness (needs sky)"
+	_sun_mangle(string) : "Sun direction (yaw pitch roll)"
+]
+
+//
+// Base classes
+//
+
+@baseclass = Angle [ angle(integer) : "Facing (degrees)" ]
+@baseclass = Targetname [ targetname(target_source) : "Name" ]
+@baseclass = Target [ target(target_destination) : "Target" ]
+
+@baseclass = Respawn
+[
+	wait(integer) : "Respawn time in seconds (0 = rule set default)" : 0
+]
+
+@baseclass base(Respawn) size(-16 -16 0, 16 16 32) = Pickup []
+@baseclass base(Pickup) color(255 120 24) = Weapon []
+@baseclass base(Pickup) color(200 160 60) = Ammo []
+@baseclass base(Pickup) color(80 220 80) = Health []
+@baseclass base(Pickup) color(80 160 255) = Armor []
+
+//
+// Spawn points and markers
+//
+
+@baseclass base(Angle) size(-16 -16 -24, 16 16 32) color(0 255 0) = PlayerSpawn []
+
+@PointClass base(PlayerSpawn) = info_player_deathmatch : "Player spawn point. Duel needs at least two." []
+@PointClass base(PlayerSpawn) = info_player_start : "Fallback spawn, used only when a map has no deathmatch spawns" []
+@PointClass base(Targetname, PlayerSpawn) = info_teleport_destination : "Where a trigger_teleport sends players" []
+@PointClass size(-8 -8 -8, 8 8 8) color(255 255 0) = info_intermission : "Camera for the end-of-match scoreboard"
+[
+	mangle(string) : "Camera angles (pitch yaw roll)"
+]
+@PointClass base(Targetname) size(-8 -8 -8, 8 8 8) color(200 150 150) = target_position : "Aim point for jump pads and other entities" []
+
+//
+// Weapons
+//
+
+@PointClass base(Weapon) = weapon_shotgun : "Shotgun: close-range burst" []
+@PointClass base(Weapon) = weapon_machinegun : "Machine gun: sustained damage" []
+@PointClass base(Weapon) = weapon_rocketlauncher : "Rocket launcher: splash damage, rocket jumps" []
+@PointClass base(Weapon) = weapon_grenadelauncher : "Grenade launcher: area denial" []
+@PointClass base(Weapon) = weapon_lightning : "Lightning gun: continuous tracking" []
+@PointClass base(Weapon) = weapon_railgun : "Railgun: long-range hitscan" []
+
+//
+// Ammunition
+//
+
+@PointClass base(Ammo) = item_ammo_shells : "Shotgun ammo" []
+@PointClass base(Ammo) = item_ammo_bullets : "Machine gun ammo" []
+@PointClass base(Ammo) = item_ammo_rockets : "Rocket launcher ammo" []
+@PointClass base(Ammo) = item_ammo_grenades : "Grenade launcher ammo" []
+@PointClass base(Ammo) = item_ammo_cells : "Lightning gun ammo" []
+@PointClass base(Ammo) = item_ammo_slugs : "Railgun ammo" []
+
+//
+// Health and armor
+//
+
+@PointClass base(Health) = item_health_small : "Small health (+5, can exceed 100)" []
+@PointClass base(Health) = item_health : "Health (+25)" []
+@PointClass base(Health) = item_health_large : "Large health (+50)" []
+@PointClass base(Health) color(120 255 255) = item_health_mega : "Mega health (+100)" []
+
+@PointClass base(Armor) = item_armor_shard : "Armor shard (+5)" []
+@PointClass base(Armor) = item_armor_light : "Light armor" []
+@PointClass base(Armor) = item_armor_medium : "Medium armor" []
+@PointClass base(Armor) color(255 60 60) = item_armor_heavy : "Heavy armor" []
+
+//
+// Triggers
+//
+
+@SolidClass base(Target) = trigger_push : "Jump pad. Target a target_position to aim it, or set a direction and speed."
+[
+	angle(integer) : "Push direction when there is no target (-1 up, -2 down)"
+	speed(integer) : "Push speed when there is no target" : 1000
+]
+@SolidClass base(Target) = trigger_teleport : "Teleporter. Target an info_teleport_destination." []
+
+//
+// Lights (used by the light compiler only)
+//
+
+@PointClass size(-8 -8 -8, 8 8 8) color(255 255 40) base(Targetname, Target) = light : "Light"
+[
+	light(integer) : "Brightness" : 300
+	wait(string) : "Fade distance multiplier" : "1"
+	delay(choices) : "Falloff" : 0 =
+	[
+		0 : "Linear"
+		1 : "1/x"
+		2 : "1/x squared"
+		3 : "None"
+	]
+	_color(color1) : "Colour (R G B, 0-1)" : "1 1 1"
+	angle(integer) : "Spotlight cone angle (needs a target)"
+	mangle(string) : "Spotlight direction (yaw pitch roll), instead of a target"
+]
+
+//
+// Brush entities
+//
+
+@SolidClass = func_detail : "Detail brushes: do not split the BSP or block vis. Use for trim and props." []
+@SolidClass = func_wall : "Solid wall that is not part of the world BSP" []
+@SolidClass = func_illusionary : "Visible but not solid" []
+@SolidClass = func_group : "Editor grouping, merged into the world by qbsp" []

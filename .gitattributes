@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+
+*.png binary
+*.jpg binary
+*.tga binary
+*.wav binary
+*.ogg binary
+*.bsp binary
+*.pk3 binary
+*.pak binary

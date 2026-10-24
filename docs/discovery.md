@@ -119,7 +119,7 @@ FTEQW and Ironwail don't share renderer code. FTEQW renders through its own batc
 
 ## Gaps found
 
-- **Map tooling.** RAVAGE needs a BSP map compiler to build its graybox arena. The usual open-source choice is [ericw-tools](https://github.com/ericwa/ericw-tools) (GPL), with TrenchBroom as the editor. FTEQW can also load Quake 3 BSP maps if a Q3-style workflow is preferred. This is needed in step 4.
+- **Map tooling.** RAVAGE needs a BSP map compiler to build its graybox arena. The usual open-source choice is [ericw-tools](https://github.com/ericwa/ericw-tools) (GPL), with TrenchBroom as the editor. FTEQW can also load Quake 3 BSP maps if a Q3-style workflow is preferred. This is needed in step 4. **Decided (2026-10-24):** TrenchBroom with ericw-tools, Quake and Valve 220 `.map` sources, compiled to BSP2. See the requirements in [plan.md](plan.md#engine-requirements).
 - **Placeholder assets.** Player model, weapon model, sounds, fonts and HUD art all need original placeholders. FTEQW can run with very little, but a font and a player model are the minimum to test movement visually.
 - **Automated tests.** Neither project has an automated test suite for movement or networking. RAVAGE will need its own, starting with a headless server and scripted client test for step 4.
 

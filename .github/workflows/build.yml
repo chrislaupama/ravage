@@ -1,0 +1,89 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install --no-install-recommends \
+            ninja-build libsdl2-dev libgl-dev libvulkan-dev libxrandr-dev \
+            libxcursor-dev libjpeg-dev libvorbis-dev libgnutls28-dev \
+            libopus-dev libwayland-dev libxkbcommon-dev libbz2-dev libpng-dev \
+            libfreetype-dev zlib1g-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --target ravage-all
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ravage-linux-x86_64
+          path: build/bin/
+
+  windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install --no-install-recommends \
+            ninja-build gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+
+      - uses: actions/cache@v4
+        id: deps
+        with:
+          path: deps/win64
+          key: win64-deps-${{ hashFiles('tools/build-win64-deps.sh', 'cmake/mingw-w64-x86_64.cmake') }}
+
+      - name: Build dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: tools/build-win64-deps.sh
+
+      - name: Configure
+        env:
+          RAVAGE_WIN64_DEPS: ${{ github.workspace }}/deps/win64
+        run: >
+          cmake -S . -B build-win64 -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
+
+      - name: Build
+        run: cmake --build build-win64 --target ravage-all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ravage-windows-x86_64
+          path: build-win64/bin/
+
+  windows-smoke:
+    needs: windows
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ravage-windows-x86_64
+          path: bin
+
+      - name: Test
+        run: tests/smoke.sh bin

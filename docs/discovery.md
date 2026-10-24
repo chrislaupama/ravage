@@ -89,6 +89,8 @@ The vision asks for a fixed-timestep simulation at 60 Hz (8.5). QuakeWorld doesn
 
 FTEQW can run fixed-interval ticks (`sv_maxtic 0`), but player movement would still be packet-driven unless that's changed in the engine. This needs a decision before Phase 2 tuning. Options are keeping QW-style timing (lowest risk, proven feel), or moving to a true fixed tick (more consistent, but a significant engine change).
 
+**Decision (2026-10-24):** keep QW-style timing for the prototype and decide once the Duel milestone is playable.
+
 ## Ironwail
 
 About 118,000 lines, derived from QuakeSpasm (the NetQuake branch, not QuakeWorld). It needs OpenGL 4.3 and doesn't run on macOS.

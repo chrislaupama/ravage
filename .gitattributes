@@ -18,3 +18,4 @@
 
 # Keep imported upstream code byte-for-byte as upstream has it
 engine/fteqw/** -text
+*.md3 binary

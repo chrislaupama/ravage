@@ -16,7 +16,8 @@ void() View_Init =
 	view_weapon.renderflags = RF_VIEWMODEL | RF_DEPTHHACK;
 };
 
-// The first-person weapons' animations, made by tools/assets/make_models.py.
+// The first-person weapons' animations, listed in each model's .framegroups
+// file by tools/assets/import_librequake.py.
 const float VIEW_ANIM_IDLE = 0;
 const float VIEW_ANIM_FIRE = 1;
 

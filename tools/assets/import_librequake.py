@@ -1,55 +1,55 @@
 #!/usr/bin/env python3
-"""Import the player model and the weapon animations from LibreQuake.
+"""Import the player and the weapons from LibreQuake.
 
-Reads LibreQuake's Blender sources (lq1/progs/src/*.mdl.blend) and writes:
+Reads LibreQuake's Blender sources (lq1/progs/src/*.mdl.blend) and writes
+content/models:
 
-  content/models/player.iqm             the player's mesh, skeleton and animations
-  content/models/player_skin.png        LibreQuake's skin, recoloured for RAVAGE
-  content/models/player_skin_luma.png   its glowing parts
-  tools/assets/librequake_weapons.json  how each first-person weapon sits in view
-                                        and moves when it fires
-
-RAVAGE's weapons are its own futuristic designs (make_models.py builds them),
-but they take their size, place in view and firing motion from LibreQuake's:
-the json holds each LibreQuake weapon's bounds, and per frame of its firing
-animation, the weapon's rigid movement (kick) and the size of its muzzle flash.
+  player.iqm                    the player's mesh, skeleton and animations
+  v_<weapon>.md3                first-person weapons, with idle and fire animations
+  v_<weapon>.md3.framegroups    their animations' frame ranges
+  g_<weapon>.iqm                weapon pickups
+  *_skin.png, *_skin_luma.png   LibreQuake's skins, recoloured for RAVAGE, and
+                                their glowing parts
 
 LibreQuake's art is BSD-3 licensed; see content/models/LICENSE.librequake and
-docs/licensing.md. The skin keeps LibreQuake's painted detail but swaps its
-palette: the yellow armour becomes pale ceramic plates, the orange suit a dark
-undersuit, and the visor and chest light glow cyan.
+docs/licensing.md. The skins keep LibreQuake's painted detail but swap its
+steampunk palette for RAVAGE's: wood and brass become pale ceramic, iron
+becomes cool gunmetal, and muzzle flashes, the player's visor and other hot
+parts glow in each weapon's energy colour.
 
-The animations are split by the original Quake player frame numbers, one IQM
-animation per action (run, stand, attack, pain, death), at 10 frames a second.
-The game code picks them by index; keep ANIMS in step with game/shared/anims.qc.
+The player's animations are split by the original Quake player frame
+numbers, one IQM animation per action, at 10 frames a second. The game code
+picks them by index; keep ANIMS in step with game/ssqc/anims.qc.
+
+LibreQuake animates its weapons by morphing vertices (shape keys), which IQM
+can't store, so the first-person weapons are MD3: every frame of the mesh,
+sampled from Blender. The first frame is the weapon at rest ("idle"), the
+rest its firing animation ("fire"); game/csqc/view.qc plays them.
 
 Needs Blender's Python module ("pip install bpy", a Python version that bpy
 supports) and a LibreQuake checkout:
 
   python import_librequake.py <librequake-dir> [content-dir]
 
-Run make_models.py afterwards, since it reads the json. The output is
-committed, so building RAVAGE needs neither. LIBREQUAKE_COMMIT is
-the revision the committed files came from.
+The output is committed and deterministic, so building RAVAGE needs neither.
+LIBREQUAKE_COMMIT is the revision the committed files came from.
 """
 
 import colorsys
-import json
+import math
 import os
 import struct
 import sys
 
 import bpy
-import numpy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from make_models import png  # noqa: E402
+from make_models import png, write_iqm  # noqa: E402
 
 LIBREQUAKE_COMMIT = 'dd4d5bffcabbcf9ceca32a1d83829109928c3f08'
-MATERIAL = 'models/player_skin'
 
 # (name, first Quake frame, last Quake frame, loops). Quake frame n is Blender
-# frame n + 1. Same order as the PLAYER_ANIM_* constants.
+# frame n + 1. Same order as the ANIM_* constants in game/ssqc/anims.qc.
 ANIMS = [
     ('stand', 12, 16, True),
     ('run', 6, 11, True),
@@ -102,8 +102,8 @@ def inside(box, x, y):
     return box[0] <= x < box[2] and box[1] <= y < box[3]
 
 
-def recolour(x, y, rgb):
-    """Map one LibreQuake skin pixel to (colour, glow) for RAVAGE."""
+def recolour_player(x, y, rgb):
+    """Map one pixel of LibreQuake's player skin to (colour, glow)."""
     r, g, b = (c / 255 for c in rgb)
     h, s, v = colorsys.rgb_to_hsv(r, g, b)
     hue = h * 360
@@ -124,7 +124,43 @@ def recolour(x, y, rgb):
     return ramp(LEATHER, v * 1.6), None
 
 
-def write_skin(image, out):
+GUNMETAL = [(8, 10, 14), (40, 48, 60), (104, 116, 132), (186, 198, 214), (238, 244, 250)]
+
+
+def weapon_recolour(energy, image):
+    """A recolour for a weapon skin whose hot parts glow in energy.
+
+    LibreQuake's weapons are dark, so brightness is first stretched until
+    the brightest twentieth of the skin is at full."""
+    pixels = image.pixels[:]
+    values = sorted(max(pixels[i:i + 3]) for i in range(0, len(pixels), 4))
+    values = [v for v in values if v > 0.03] or [1.0]
+    gain = 1 / max(values[len(values) * 19 // 20], 0.1)
+
+    def recolour(x, y, rgb):
+        r, g, b = (c / 255 for c in rgb)
+        h, s, v = colorsys.rgb_to_hsv(r, g, b)
+        hue = h * 360
+        if s > 0.6 and v > 0.55 and (hue < 55 or hue >= 340):
+            # Muzzle flashes and glowing cells.
+            colour = lerp(energy, (255, 255, 255), max(0.0, v - 0.75) * 2)
+            return colour, tuple(c * 0.5 for c in colour)
+        v = min(1.0, v * gain)
+        if 90 <= hue < 200 and s > 0.15:
+            # Green-tinted iron becomes dark metal with energy-lit edges.
+            colour = lerp((14, 18, 24), energy, v ** 2)
+            return colour, (tuple(c * 0.35 for c in colour) if v > 0.6 else None)
+        if 12 <= hue < 65 and s > 0.25:
+            # Wood and brass become ceramic.
+            return ramp(ARMOUR, v * 1.1), None
+        if s < 0.3:
+            return ramp(GUNMETAL, v), None
+        return ramp(LEATHER, v * 1.3), None
+    return recolour
+
+
+def write_skin(image, recolour, out, name):
+    """Write image, recoloured, as <name>.png and <name>_luma.png."""
     width, height = image.size
     pixels = image.pixels[:]
     rows, luma_rows = [], []
@@ -138,8 +174,8 @@ def write_skin(image, out):
             luma_row.extend(min(255, round(c)) for c in (glow or (0, 0, 0)))
         rows.append(row)
         luma_rows.append(luma_row)
-    png(os.path.join(out, 'player_skin.png'), width, height, rows)
-    png(os.path.join(out, 'player_skin_luma.png'), width, height, luma_rows)
+    png(os.path.join(out, name + '.png'), width, height, rows)
+    png(os.path.join(out, name + '_luma.png'), width, height, luma_rows)
 
 
 #
@@ -225,203 +261,140 @@ def sample_poses(scene, arm):
     return frames
 
 
-#
-# IQM
-#
-
-IQM_POSITION, IQM_TEXCOORD, IQM_NORMAL, IQM_BLENDINDEXES, IQM_BLENDWEIGHTS = 0, 1, 2, 4, 5
-IQM_UBYTE, IQM_FLOAT = 1, 7
-IQM_LOOP = 1
-
-
-def write_iqm(path, name, joints, verts, tris, poses):
-    strings = [b'', name.encode(), MATERIAL.encode()]
-    strings += [j[0].encode() for j in joints]
-    strings += [a[0].encode() for a in ANIMS]
-    text, offsets = b'', {}
-    for s in strings:
-        if s not in offsets:
-            offsets[s] = len(text)
-            text += s + b'\0'
-    text += b'\0' * (-len(text) % 4)
-
-    def string(s):
-        return offsets[s.encode()]
-
-    # Every frame of every animation, in order.
-    frame_list = [q for _, first, last, _ in ANIMS for q in range(first, last + 1)]
-    channels = []
-    for j in range(len(joints)):
-        for c in range(10):
-            values = [poses[q][j][c] for q in frame_list]
-            lo, hi = min(values), max(values)
-            channels.append((lo, (hi - lo) / 65535 if hi > lo else 0.0))
-
-    n, nj = len(verts), len(joints)
-    nf = len(frame_list)
-    header_size = 16 + 27 * 4
-    ofs_text = header_size
-    ofs_meshes = ofs_text + len(text)
-    ofs_varrays = ofs_meshes + 6 * 4
-    ofs_pos = ofs_varrays + 5 * 5 * 4
-    ofs_uv = ofs_pos + n * 12
-    ofs_norm = ofs_uv + n * 8
-    ofs_bi = ofs_norm + n * 12
-    ofs_bw = ofs_bi + n * 4
-    ofs_tris = ofs_bw + n * 4
-    ofs_joints = ofs_tris + len(tris) * 12
-    ofs_poses = ofs_joints + nj * 48
-    ofs_anims = ofs_poses + nj * 88
-    ofs_frames = ofs_anims + len(ANIMS) * 20
-    size = ofs_frames + nf * nj * 10 * 2
-    size += -size % 4
-
-    out = bytearray(b'INTERQUAKEMODEL\0')
-    out += struct.pack('<27I',
-                       2, size, 0,
-                       len(text), ofs_text,
-                       1, ofs_meshes,
-                       5, n, ofs_varrays,
-                       len(tris), ofs_tris, 0,
-                       nj, ofs_joints,
-                       nj, ofs_poses,
-                       len(ANIMS), ofs_anims,
-                       nf, nj * 10, ofs_frames, 0,
-                       0, 0, 0, 0)
-    out += text
-    out += struct.pack('<6I', string(name), string(MATERIAL), 0, n, 0, len(tris))
-    out += struct.pack('<5I', IQM_POSITION, 0, IQM_FLOAT, 3, ofs_pos)
-    out += struct.pack('<5I', IQM_TEXCOORD, 0, IQM_FLOAT, 2, ofs_uv)
-    out += struct.pack('<5I', IQM_NORMAL, 0, IQM_FLOAT, 3, ofs_norm)
-    out += struct.pack('<5I', IQM_BLENDINDEXES, 0, IQM_UBYTE, 4, ofs_bi)
-    out += struct.pack('<5I', IQM_BLENDWEIGHTS, 0, IQM_UBYTE, 4, ofs_bw)
-    for v in verts:
-        out += struct.pack('<3f', *v[0])
-    for v in verts:
-        out += struct.pack('<2f', *v[1])
-    for v in verts:
-        out += struct.pack('<3f', *v[2])
-    for v in verts:
-        out += struct.pack('<4B', *v[3])
-    for v in verts:
-        out += struct.pack('<4B', *v[4])
-    for tri in tris:
-        out += struct.pack('<3I', *tri)
-    for joint_name, parent, rest in joints:
-        out += struct.pack('<Ii10f', string(joint_name), parent, *rest)
-    for j, (_, parent, _) in enumerate(joints):
-        offsets_scales = [channels[j * 10 + c][0] for c in range(10)] + [channels[j * 10 + c][1] for c in range(10)]
-        out += struct.pack('<iI20f', parent, 0x3FF, *offsets_scales)
-    first = 0
-    for anim_name, a, b, loops in ANIMS:
-        count = b - a + 1
-        out += struct.pack('<3IfI', string(anim_name), first, count, FRAMERATE, IQM_LOOP if loops else 0)
-        first += count
-    for q in frame_list:
-        for j in range(nj):
-            for c in range(10):
-                lo, scale = channels[j * 10 + c]
-                out += struct.pack('<H', round((poses[q][j][c] - lo) / scale) if scale else 0)
-    out += b'\0' * (size - len(out))
-    assert len(out) == size
-    with open(path, 'wb') as f:
-        f.write(out)
+def write_player(librequake, out):
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(librequake, 'lq1', 'progs', 'src', 'player.mdl.blend'))
+    arm = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
+    mesh_obj = next(o for o in bpy.data.objects if o.type == 'MESH')
+    write_skin(bpy.data.images['player.mdl.0.png'], recolour_player, out, 'player_skin')
+    joints, verts, tris = collect(arm, mesh_obj)
+    poses = sample_poses(bpy.context.scene, arm)
+    anims, frames = [], []
+    for anim_name, first, last, loops in ANIMS:
+        anims.append((anim_name, len(frames), last - first + 1, FRAMERATE, loops))
+        frames += [poses[q] for q in range(first, last + 1)]
+    write_iqm(os.path.join(out, 'player.iqm'), 'player', [v[:3] for v in verts], tris,
+              material='models/player_skin', blend=[(v[3], v[4]) for v in verts],
+              joints=joints, anims=anims, frames=frames)
 
 
 #
 # Weapons
 #
 
-# RAVAGE weapon: the LibreQuake first-person models it takes its size and
-# its firing animation from. The railgun borrows the super nailgun's length
-# and the super shotgun's heavy kick.
+# RAVAGE weapon: (LibreQuake model, energy colour). The railgun is
+# LibreQuake's super nailgun.
 WEAPONS = {
-    'shotgun': ('v_shot', 'v_shot'),
-    'machinegun': ('v_nail', 'v_nail'),
-    'rocketlauncher': ('v_rock2', 'v_rock2'),
-    'grenadelauncher': ('v_rock', 'v_rock'),
-    'lightning': ('v_light', 'v_light'),
-    'railgun': ('v_nail2', 'v_shot2'),
+    'shotgun': ('shot', (255, 150, 60)),
+    'machinegun': ('nail', (255, 170, 70)),
+    'rocketlauncher': ('rock2', (255, 110, 50)),
+    'grenadelauncher': ('rock', (120, 255, 140)),
+    'lightning': ('light', (90, 220, 255)),
+    'railgun': ('nail2', (120, 255, 140)),
 }
 
 
-def evaluated_points(obj):
+def open_blend(librequake, name):
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(librequake, 'lq1', 'progs', 'src', name + '.mdl.blend'))
+    return next(o for o in bpy.data.objects if o.type == 'MESH'), bpy.data.images[0]
+
+
+def sample_mesh(obj):
+    """The mesh at the current frame: (corners, triangles). Corners are
+    (vertex, uv) pairs, so a vertex with two texture coordinates is split;
+    positions and normals are per evaluated vertex, in model space."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     evaluated = obj.evaluated_get(depsgraph)
     me = evaluated.to_mesh()
-    points = numpy.array([tuple(obj.matrix_world @ v.co) for v in me.vertices])
+    me.calc_loop_triangles()
+    uv = me.uv_layers.active.data
+    normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
+    positions = [tuple(obj.matrix_world @ v.co) for v in me.vertices]
+    normals = [tuple((normal_matrix @ v.normal).normalized()) for v in me.vertices]
+    corners, tris, lookup = [], [], {}
+    for tri in me.loop_triangles:
+        ids = []
+        for loop in tri.loops:
+            vi = me.loops[loop].vertex_index
+            u, v = uv[loop].uv
+            key = (vi, round(u, 6), round(v, 6))
+            if key not in lookup:
+                lookup[key] = len(corners)
+                corners.append((vi, (u, 1 - v)))
+            ids.append(lookup[key])
+        # Blender winds triangles counter-clockwise; IQM and MD3 want clockwise.
+        tris.append((ids[0], ids[2], ids[1]))
     evaluated.to_mesh_clear()
-    return points
+    return corners, tris, positions, normals
 
 
-def rigid_fit(rest, moved):
-    """Rotation matrix and translation taking rest onto moved (Kabsch)."""
-    a, b = rest.mean(axis=0), moved.mean(axis=0)
-    u, _, vt = numpy.linalg.svd((rest - a).T @ (moved - b))
-    d = numpy.sign(numpy.linalg.det(vt.T @ u.T))
-    rot = vt.T @ numpy.diag([1, 1, d]) @ u.T
-    return rot, b - rot @ a
-
-
-def open_weapon(librequake, name):
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(librequake, 'lq1', 'progs', 'src', name + '.mdl.blend'))
-    obj = next(o for o in bpy.data.objects if o.type == 'MESH')
-    keys = obj.data.shape_keys.key_blocks
-    # Shape keys that show or hide the muzzle flash, and which way round:
-    # LibreQuake hides a flash by shrinking it into the barrel.
-    basis = numpy.array([tuple(v.co) for v in keys[0].data])
-    is_flash = numpy.zeros(len(basis), bool)
-    flash_keys = []
-    for key in keys[1:]:
-        if 'flame' not in key.name and 'fire' not in key.name:
-            continue
-        shape = numpy.array([tuple(v.co) for v in key.data])
-        moved = numpy.linalg.norm(shape - basis, axis=1) > 0.01
-        is_flash |= moved
-        shows = numpy.ptp(shape[moved], axis=0).max() > numpy.ptp(basis[moved], axis=0).max()
-        flash_keys.append((key, shows))
-    return obj, is_flash, flash_keys
-
-
-def weapon_bounds(librequake, name):
-    obj, is_flash, _ = open_weapon(librequake, name)
+def write_pickup(librequake, lq, energy, out, name):
+    obj, image = open_blend(librequake, 'g_' + lq)
     bpy.context.scene.frame_set(bpy.context.scene.frame_start)
-    rest = evaluated_points(obj)[~is_flash]
-    return [[round(float(x), 2) for x in rest.min(axis=0)], [round(float(x), 2) for x in rest.max(axis=0)]]
+    corners, tris, positions, normals = sample_mesh(obj)
+    write_skin(image, weapon_recolour(energy, image), out, name + '_skin')
+    verts = [(positions[vi], uv, normals[vi]) for vi, uv in corners]
+    write_iqm(os.path.join(out, name + '.iqm'), name, verts, tris, material='models/%s_skin' % name)
 
 
-def weapon_motion(librequake, name):
-    """Per frame of a weapon's firing animation, its kick and flash."""
-    obj, is_flash, flash_keys = open_weapon(librequake, name)
+def md3_normal(n):
+    lat = round(math.acos(max(-1.0, min(1.0, n[2]))) * 255 / (2 * math.pi)) & 255
+    lng = round(math.atan2(n[1], n[0]) * 255 / (2 * math.pi)) & 255
+    return lat << 8 | lng
+
+
+def name_field(text, size):
+    return text.encode().ljust(size, b'\0')
+
+
+def write_md3(path, name, material, corners, tris, frames):
+    """frames: per frame, (positions, normals) per evaluated vertex."""
+    nv, nt, nf = len(corners), len(tris), len(frames)
+    surf_header = 4 + 64 + 4 * 10
+    ofs_shaders = surf_header
+    ofs_tris = ofs_shaders + 68
+    ofs_st = ofs_tris + nt * 12
+    ofs_xyz = ofs_st + nv * 8
+    surf_size = ofs_xyz + nf * nv * 8
+    header = 4 + 4 + 64 + 4 * 9
+    ofs_frames = header
+    ofs_surfaces = ofs_frames + nf * 56
+
+    out = bytearray(b'IDP3')
+    out += struct.pack('<i', 15) + name_field(name, 64)
+    out += struct.pack('<9i', 0, nf, 0, 1, 0, ofs_frames, ofs_surfaces, ofs_surfaces, ofs_surfaces + surf_size)
+    for k, (positions, _) in enumerate(frames):
+        lo = [min(p[i] for p in positions) for i in range(3)]
+        hi = [max(p[i] for p in positions) for i in range(3)]
+        radius = max(math.sqrt(sum(c * c for c in p)) for p in positions)
+        out += struct.pack('<10f', *lo, *hi, 0, 0, 0, radius) + name_field('frame%d' % k, 16)
+    out += b'IDP3' + name_field(name, 64)
+    out += struct.pack('<10i', 0, nf, 1, nv, nt, ofs_tris, ofs_shaders, ofs_st, ofs_xyz, surf_size)
+    out += name_field(material, 64) + struct.pack('<i', 0)
+    for tri in tris:
+        out += struct.pack('<3i', *tri)
+    for _, uv in corners:
+        out += struct.pack('<2f', *uv)
+    for positions, normals in frames:
+        for vi, _ in corners:
+            out += struct.pack('<3hH', *(round(c * 64) for c in positions[vi]), md3_normal(normals[vi]))
+    with open(path, 'wb') as f:
+        f.write(out)
+
+
+def write_view_weapon(librequake, lq, energy, out, name):
+    obj, image = open_blend(librequake, 'v_' + lq)
     scene = bpy.context.scene
+    write_skin(image, weapon_recolour(energy, image), out, name + '_skin')
     frames = []
-    rest = None
     for f in range(scene.frame_start, scene.frame_end + 1):
         scene.frame_set(f)
-        body = evaluated_points(obj)[~is_flash]
-        if rest is None:
-            rest = body
-        keep = numpy.ones(len(body), bool)
-        # Fit twice, dropping the moving parts (spinning barrels, opening
-        # claws) that don't follow the weapon as a whole.
-        for _ in range(2):
-            rot, move = rigid_fit(rest[keep], body[keep])
-            keep = numpy.linalg.norm(rest @ rot.T + move - body, axis=1) < 0.5
-        flash = max([k.value if shows else 1 - k.value for k, shows in flash_keys] or [0])
-        frames.append({'rotation': [[round(float(x), 4) for x in row] for row in rot],
-                       'move': [round(float(x), 3) for x in move],
-                       'flash': round(flash, 3)})
-    return frames
-
-
-def write_weapon_motions(librequake, path):
-    motions = {name: {'bounds': weapon_bounds(librequake, size_from), 'frames': weapon_motion(librequake, motion_from),
-                      'librequake_models': sorted({size_from, motion_from})}
-               for name, (size_from, motion_from) in WEAPONS.items()}
-    with open(path, 'w') as f:
-        json.dump({'librequake_commit': LIBREQUAKE_COMMIT, 'framerate': FRAMERATE, 'weapons': motions},
-                  f, indent=1, sort_keys=True)
-        f.write('\n')
+        corners, tris, positions, normals = sample_mesh(obj)
+        frames.append((positions, normals))
+    write_md3(os.path.join(out, name + '.md3'), name, 'models/%s_skin' % name, corners, tris, frames)
+    with open(os.path.join(out, name + '.md3.framegroups'), 'w') as f:
+        # first frame, frame count, frames per second, loops, name
+        f.write('0 1 %g true idle\n' % FRAMERATE)
+        f.write('1 %d %g false fire\n' % (len(frames) - 1, FRAMERATE))
 
 
 def main():
@@ -431,18 +404,11 @@ def main():
     content = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), '..', '..', 'content')
     out = os.path.join(content, 'models')
     os.makedirs(out, exist_ok=True)
-
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(librequake, 'lq1', 'progs', 'src', 'player.mdl.blend'))
-    arm = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
-    mesh_obj = next(o for o in bpy.data.objects if o.type == 'MESH')
-    write_skin(bpy.data.images['player.mdl.0.png'], out)
-    joints, verts, tris = collect(arm, mesh_obj)
-    poses = sample_poses(bpy.context.scene, arm)
-    write_iqm(os.path.join(out, 'player.iqm'), 'player', joints, verts, tris, poses)
-    print('wrote player.iqm (%d joints, %d vertices, %d triangles, %d animations) to %s'
-          % (len(joints), len(verts), len(tris), len(ANIMS), os.path.normpath(out)))
-    write_weapon_motions(librequake, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'librequake_weapons.json'))
-    print('wrote librequake_weapons.json')
+    write_player(librequake, out)
+    for name, (lq, energy) in WEAPONS.items():
+        write_view_weapon(librequake, lq, energy, out, 'v_' + name)
+        write_pickup(librequake, lq, energy, out, 'g_' + name)
+    print('wrote the player and %d weapons to %s' % (len(WEAPONS), os.path.normpath(out)))
 
 
 if __name__ == '__main__':

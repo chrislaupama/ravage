@@ -3,7 +3,8 @@
 # tools/assets/ generates (so nobody edits a generated file by hand or
 # forgets to regenerate), and every model or sound the game code names
 # exists in content/. The files import_librequake.py makes need Blender and
-# LibreQuake, so they are only checked for being there.
+# LibreQuake to regenerate, so they are only checked for being there (with
+# LibreQuake's license).
 #
 #   tests/assets.sh
 set -eu
@@ -22,12 +23,12 @@ for file in $(cd "$work" && find models sound -type f | sort); do
 		fail=1
 	fi
 done
-for file in player.iqm player_skin.png player_skin_luma.png LICENSE.librequake CREDITS.librequake; do
+for file in LICENSE.librequake CREDITS.librequake; do
 	[ -f "$root/content/models/$file" ] || { echo "FAIL missing content/models/$file"; fail=1; }
 done
 
 # Model paths are relative to the game folder, sound paths to its sound/.
-for path in $(grep -ohE '"models/[a-z0-9_]+\.iqm"' "$root"/game/*/*.qc | tr -d '"' | sort -u); do
+for path in $(grep -ohE '"models/[a-z0-9_]+\.(iqm|md3)"' "$root"/game/*/*.qc | tr -d '"' | sort -u); do
 	[ -f "$root/content/$path" ] || { echo "FAIL missing $path"; fail=1; }
 done
 for path in $(grep -ohE '"[a-z]+/[a-z0-9_]+\.wav"' "$root"/game/*/*.qc | tr -d '"' | sort -u); do

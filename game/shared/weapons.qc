@@ -57,12 +57,12 @@ string(float wep) W_ViewModel =
 {
 	switch (wep)
 	{
-	case WEP_SHOTGUN:		return "models/v_shotgun.iqm";
-	case WEP_MACHINEGUN:	return "models/v_machinegun.iqm";
-	case WEP_ROCKET:		return "models/v_rocketlauncher.iqm";
-	case WEP_GRENADE:		return "models/v_grenadelauncher.iqm";
-	case WEP_LIGHTNING:		return "models/v_lightning.iqm";
-	default:				return "models/v_railgun.iqm";
+	case WEP_SHOTGUN:		return "models/v_shotgun.md3";
+	case WEP_MACHINEGUN:	return "models/v_machinegun.md3";
+	case WEP_ROCKET:		return "models/v_rocketlauncher.md3";
+	case WEP_GRENADE:		return "models/v_grenadelauncher.md3";
+	case WEP_LIGHTNING:		return "models/v_lightning.md3";
+	default:				return "models/v_railgun.md3";
 	}
 };
 

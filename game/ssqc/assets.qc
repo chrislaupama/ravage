@@ -1,6 +1,6 @@
 /*
-	Models and sounds the server uses, made by tools/assets/. The player model is
-	LibreQuake's (BSD-3); everything else is original.
+	Models and sounds the server uses, made by tools/assets/. The player and weapon
+	models are LibreQuake's (BSD-3); everything else is original.
 */
 
 const string MDL_PLAYER = "models/player.iqm";

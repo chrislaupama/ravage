@@ -76,7 +76,7 @@
 //#define DSPMODELS				//Doom sprites!
 #define MD1MODELS				//Quake's models.	//RAVAGE: .mdl placeholders and local Quake references
 //#define MD2MODELS				//Quake2's models
-//#define MD3MODELS				//Quake3's models, also often used for q1 etc too.
+#define MD3MODELS				//Quake3's models, also often used for q1 etc too.	//RAVAGE: animated first-person weapons from LibreQuake
 //#define MD5MODELS				//Doom3 models.
 //#define ZYMOTICMODELS			//nexuiz uses these, for some reason.
 //#define DPMMODELS				//these keep popping up, despite being a weak format.

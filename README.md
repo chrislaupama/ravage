@@ -4,7 +4,7 @@
 
 RAVAGE is a standalone, multiplayer-only competitive arena FPS in the tradition of Quake and QuakeWorld. It runs on RAVAGE ENGINE, built from FTEQW with selected rendering improvements from Ironwail.
 
-**Status:** pre-production. The engine builds for Linux and Windows, and the first graybox Duel arena plays as a Duel with weapons, pickups, scoring, placeholder models and sounds, and a HUD. All of it is original and runs without Quake installed. The first target is a minimal RAVAGE DUEL (1v1). See [Building RAVAGE](docs/building.md) and [Making maps](docs/mapping.md).
+**Status:** pre-production. The engine builds for Linux and Windows, and the first graybox Duel arena plays as a Duel with weapons, pickups, scoring, models and sounds from LibreQuake, and a HUD. All of it is original or openly licensed, and runs without Quake installed. The first target is a minimal RAVAGE DUEL (1v1). See [Building RAVAGE](docs/building.md) and [Making maps](docs/mapping.md).
 
 ## Documents
 

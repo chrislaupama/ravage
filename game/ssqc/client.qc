@@ -94,6 +94,7 @@ void() PutClientInServer =
 	W_UpdateCurrentAmmo();
 
 	setmodel(self, MDL_PLAYER);
+	self.frame = ANIM_STAND;
 	setsize(self, VEC_HULL_MIN, VEC_HULL_MAX);
 	setorigin(self, spot.origin + '0 0 1');
 	self.rv_spawn_origin = self.origin;
@@ -121,6 +122,7 @@ void() PlayerPostThink =
 		return;
 
 	W_Frame();
+	Player_Animate();
 
 	// Health over 100 ticks down by one per second.
 	if (self.health > self.max_health && time >= self.rv_mega_decay)

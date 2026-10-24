@@ -6,7 +6,7 @@ void(float apilevel, string enginename, float engineversion) CSQC_Init =
 {
 	View_Init();
 	registercommand("rv_hudtest", "Print the stats the HUD shows (used by tests/match.sh)");
-	registercommand("rv_framebench", "rv_framebench <frames>: time whole frames while turning the view (used by tools/bench-map.sh)");
+	registercommand("rv_framebench", "rv_framebench <frames> [players]: time whole frames while turning the view, optionally among running player models (used by tools/bench-map.sh)");
 };
 
 float(string cmd) CSQC_ConsoleCommand =
@@ -16,7 +16,7 @@ float(string cmd) CSQC_ConsoleCommand =
 	tokenize(cmd);
 	if (argv(0) == "rv_framebench")
 	{
-		View_StartBench(stof(argv(1)));
+		View_StartBench(stof(argv(1)), stof(argv(2)));
 		return TRUE;
 	}
 	if (argv(0) != "rv_hudtest")

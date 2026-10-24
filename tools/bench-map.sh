@@ -2,7 +2,9 @@
 # Rendering benchmark: load a map in the client, then turn the view a full
 # 360 degrees from the first spawn point and report the frame rate, three
 # times each with the engine's "timerefresh" (3D view only) and the game's
-# "rv_framebench" (whole frames, including the HUD and first-person weapon). Without a GPU it runs with software rendering (for example
+# "rv_framebench" (whole frames, including the HUD and first-person weapon),
+# then three more framebench runs among 16 animated player models. Without
+# a GPU it runs with software rendering (for example
 # Xvfb with Mesa llvmpipe), which is CPU-bound but steady enough to catch
 # regressions; CI runs it that way.
 #
@@ -37,9 +39,9 @@ trap 'rm -f "$cfg"' EXIT
 	# Whole frames, including the HUD and first-person weapon. Each run
 	# must start on a fresh frame and finish before the next starts, hence
 	# the waits around it.
-	for run in 1 2 3; do
+	for players in 0 0 0 16 16 16; do
 		echo wait
-		echo "rv_framebench $frames"
+		echo "rv_framebench $frames $players"
 		i=0; while [ $i -lt $((frames + 20)) ]; do echo wait; i=$((i + 1)); done
 	done
 	echo quit

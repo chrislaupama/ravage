@@ -8,6 +8,7 @@ assets.qc
 world.qc
 spawn.qc
 anims.qc
+matchstats.qc
 combat.qc
 weapons.qc
 items.qc

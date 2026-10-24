@@ -25,3 +25,21 @@ const float MATCH_OVERTIME = 3;		// time ran out with the scores tied: next frag
 const float MATCH_OVER = 4;			// intermission
 const float MATCH_PLAYERS = 2;		// a Duel is one on one
 const float MATCH_COUNTDOWN_TIME = 5;
+
+// Post-match statistics (game/ssqc/matchstats.qc). The server counts them
+// from game events while a match is on, and at the end sends every
+// player's values to the clients in one EV_MATCH_STATS event:
+//   byte EV_MATCH_STATS, byte player count, then per player:
+//   byte player number (0 based), MS_COUNT shorts.
+const float EV_MATCH_STATS = 1;
+const float MS_FRAGS = 0;			// frags scored, minus suicides
+const float MS_DEATHS = 1;
+const float MS_DAMAGE_DEALT = 2;	// to the opponent, health and armor
+const float MS_DAMAGE_TAKEN = 3;	// from anything, including yourself
+const float MS_HEALTH = 4;			// health picked up
+const float MS_ARMOR = 5;			// armor picked up
+const float MS_MEGAS = 6;			// mega health pickups
+const float MS_DURATION = 7;		// match length in seconds, the same for everyone
+const float MS_SHOTS = 8;			// first of WEP_COUNT: shots fired, by weapon
+const float MS_HITS = 14;			// first of WEP_COUNT: shots that hit the opponent
+const float MS_COUNT = 20;

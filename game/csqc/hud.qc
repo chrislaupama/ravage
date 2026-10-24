@@ -41,10 +41,10 @@ void(vector screen) Hud_Status =
 	local float health, armor, wep, ammo;
 	local vector rgb;
 
-	health = getstatf(STAT_RV_HEALTH);
-	armor = getstatf(STAT_RV_ARMOR);
-	wep = getstatf(STAT_RV_WEAPON);
-	ammo = getstatf(STAT_RV_AMMO + wep - 1);
+	health = PlayerStat(STAT_RV_HEALTH);
+	armor = PlayerStat(STAT_RV_ARMOR);
+	wep = PlayerStat(STAT_RV_WEAPON);
+	ammo = PlayerStat(STAT_RV_AMMO + wep - 1);
 
 	Hud_Panel([10 * u, screen_y - 50 * u], [180 * u, 40 * u]);
 	rgb = HUD_WHITE;
@@ -70,13 +70,13 @@ void(vector screen) Hud_WeaponBar =
 	local float wep, current, items, ammo;
 	local vector pos, size;
 
-	current = getstatf(STAT_RV_WEAPON);
-	items = getstatf(STAT_RV_ITEMS);
+	current = PlayerStat(STAT_RV_WEAPON);
+	items = PlayerStat(STAT_RV_ITEMS);
 	size = [26 * u, 24 * u];
 	pos = [screen_x * 0.5 - (WEP_COUNT * 28 * u - 2 * u) * 0.5, screen_y - 34 * u];
 	for (wep = WEP_SHOTGUN; wep <= WEP_COUNT; wep = wep + 1)
 	{
-		ammo = getstatf(STAT_RV_AMMO + wep - 1);
+		ammo = PlayerStat(STAT_RV_AMMO + wep - 1);
 		if (wep == current)
 			drawfill(pos, size, HUD_ACCENT, 0.75);
 		else
@@ -95,7 +95,7 @@ float() Hud_OpponentFrags =
 
 	best = -100000;
 	for (i = 0; i < min(maxclients, 32); i = i + 1)
-		if (i != player_localnum && getplayerkeyvalue(i, "name") != "" && !getplayerkeyfloat(i, "*spectator"))
+		if (i != PlayerWatched() && getplayerkeyvalue(i, "name") != "" && !getplayerkeyfloat(i, "*spectator"))
 			best = max(best, getplayerkeyfloat(i, "frags"));
 	return best;
 };
@@ -108,7 +108,7 @@ void(vector screen) Hud_Frags =
 
 	opponent = Hud_OpponentFrags();
 	Hud_Panel([screen_x - 150 * u, 10 * u], [140 * u, 34 * u]);
-	Hud_Counter([screen_x - 100 * u, 14 * u], "YOU", getplayerkeyfloat(player_localnum, "frags"), HUD_ACCENT, 1);
+	Hud_Counter([screen_x - 100 * u, 14 * u], "YOU", getplayerkeyfloat(PlayerWatched(), "frags"), HUD_ACCENT, 1);
 	if (opponent > -100000)
 		Hud_Counter([screen_x - 18 * u, 14 * u], "OPPONENT", opponent, HUD_WHITE, 1);
 };
@@ -132,18 +132,18 @@ void(vector screen) Hud_Match =
 	local float state, clock;
 	local vector pos;
 
-	state = getstatf(STAT_RV_MATCH_STATE);
-	clock = getstatf(STAT_RV_MATCH_TIME);
+	state = PlayerStat(STAT_RV_MATCH_STATE);
+	clock = PlayerStat(STAT_RV_MATCH_TIME);
 	pos = [screen_x * 0.5, 10 * u];
 	Hud_Panel(pos - [60 * u, 0], [120 * u, 30 * u]);
 	switch (state)
 	{
 	case MATCH_WARMUP:
 		Hud_Text(pos + [0, 4 * u], "WARMUP", 12 * u, HUD_ACCENT, 0.5);
-		Hud_Text(pos + [0, 19 * u], sprintf("%g/%g READY", getstatf(STAT_RV_READY_COUNT), MATCH_PLAYERS), 7 * u, HUD_LABEL, 0.5);
-		if (getstatf(STAT_RV_PLAYERS) < MATCH_PLAYERS)
+		Hud_Text(pos + [0, 19 * u], sprintf("%g/%g READY", PlayerStat(STAT_RV_READY_COUNT), MATCH_PLAYERS), 7 * u, HUD_LABEL, 0.5);
+		if (PlayerStat(STAT_RV_PLAYERS) < MATCH_PLAYERS)
 			Hud_Text([screen_x * 0.5, screen_y * 0.2], "WAITING FOR AN OPPONENT", 9 * u, HUD_WHITE, 0.5);
-		else if (!getstatf(STAT_RV_READY))
+		else if (!PlayerStat(STAT_RV_READY))
 			Hud_Text([screen_x * 0.5, screen_y * 0.2], "PRESS F3 WHEN READY", 9 * u, HUD_WHITE, 0.5);
 		else
 			Hud_Text([screen_x * 0.5, screen_y * 0.2], "WAITING FOR YOUR OPPONENT TO READY UP", 9 * u, HUD_WHITE, 0.5);
@@ -157,7 +157,7 @@ void(vector screen) Hud_Match =
 		if (clock)
 			Hud_Text(pos + [0, 5 * u], Hud_Clock(clock - time), 20 * u, clock - time <= 30 ? HUD_LOW : HUD_WHITE, 0.5);
 		else
-			Hud_Text(pos + [0, 5 * u], Hud_Clock(time - getstatf(STAT_RV_MATCH_START)), 20 * u, HUD_WHITE, 0.5);
+			Hud_Text(pos + [0, 5 * u], Hud_Clock(time - PlayerStat(STAT_RV_MATCH_START)), 20 * u, HUD_WHITE, 0.5);
 		break;
 	case MATCH_OVERTIME:
 		Hud_Text(pos + [0, 4 * u], "OVERTIME", 12 * u, HUD_LOW, 0.5);
@@ -174,10 +174,10 @@ void() Hud_Announcer =
 {
 	local float state, second;
 
-	state = getstatf(STAT_RV_MATCH_STATE);
+	state = PlayerStat(STAT_RV_MATCH_STATE);
 	if (state == MATCH_COUNTDOWN)
 	{
-		second = ceil(getstatf(STAT_RV_MATCH_TIME) - time);
+		second = ceil(PlayerStat(STAT_RV_MATCH_TIME) - time);
 		if (hud_announced_state != MATCH_COUNTDOWN)
 			localsound("announcer/getready.wav", CHAN_VOICE, 1);
 		else if (second != hud_announced_second)
@@ -213,11 +213,11 @@ void(vector screen) Hud_Scoreboard =
 	local float shown[32];
 	local vector pos;
 
-	pos = [screen_x * 0.5, screen_y * 0.3];
+	pos = [screen_x * 0.5, ms_players ? 40 * u : screen_y * 0.3];
 	Hud_Text(pos, "MATCH OVER", 20 * u, HUD_ACCENT, 0.5);
 	pos_y = pos_y + 26 * u;
 	frags = getplayerkeyfloat(player_localnum, "frags");
-	if (!getplayerkeyfloat(player_localnum, "*spectator") && Hud_OpponentFrags() > -100000)
+	if (!isdemo() && !getplayerkeyfloat(player_localnum, "*spectator") && Hud_OpponentFrags() > -100000)
 	{
 		Hud_Text(pos, frags > Hud_OpponentFrags() ? "YOU WIN" : frags < Hud_OpponentFrags() ? "YOU LOSE" : "DRAW",
 			10 * u, HUD_WHITE, 0.5);
@@ -244,10 +244,11 @@ void(vector screen) Hud_Scoreboard =
 			break;
 		shown[best] = TRUE;
 		Hud_Panel(pos - [110 * u, 2 * u], [220 * u, 16 * u]);
-		Hud_Text(pos - [102 * u, 0], getplayerkeyvalue(best, "name"), 11 * u, best == player_localnum ? HUD_ACCENT : HUD_WHITE, 0);
+		Hud_Text(pos - [102 * u, 0], getplayerkeyvalue(best, "name"), 11 * u, best == PlayerWatched() ? HUD_ACCENT : HUD_WHITE, 0);
 		Hud_Text(pos + [102 * u, 0], ftos(best_frags), 11 * u, HUD_WHITE, 1);
 		pos_y = pos_y + 18 * u;
 	}
+	Hud_MatchStats(pos + [0, 8 * u]);
 };
 
 void(vector screen) Hud_Draw =
@@ -264,6 +265,6 @@ void(vector screen) Hud_Draw =
 	Hud_Frags(screen);
 	Hud_Status(screen);
 	Hud_WeaponBar(screen);
-	if (getstatf(STAT_RV_HEALTH) <= 0)
+	if (PlayerStat(STAT_RV_HEALTH) <= 0)
 		Hud_Text([screen_x * 0.5, screen_y * 0.42], "PRESS FIRE TO RESPAWN", 10 * hud_unit, HUD_WHITE, 0.5);
 };

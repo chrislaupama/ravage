@@ -17,6 +17,10 @@
 	               by tests/match.sh in the client's log)
 	8. overtime:   with time up and the scores tied the match goes to
 	               overtime, and the next frag ends it
+	9. stats:      the post-match statistics counted the shots, hits,
+	               damage, frags, deaths and pickups above, and none from
+	               warmup (tests/match.sh checks the saved file and the
+	               demo)
 
 	Each check prints "RAVAGE matchtest: ok <name>" or "FAIL <name>: why".
 	The server quits when all checks have run.
@@ -236,8 +240,9 @@ void() MatchTest_Frame =
 	case 6:	// give the client a moment to answer
 		if (time - mt_phase_time < 1)
 			return;
-		// Run the clock out with the scores tied.
-		mt_target.frags = mt_runner.frags;
+		// Level the scores with a frag for the target, and run the clock
+		// out.
+		Rules_Frag(mt_target, mt_runner);
 		rv_match_time = time;
 		MatchTest_Next(7);
 		return;
@@ -255,9 +260,32 @@ void() MatchTest_Frame =
 
 	case 8:
 		if (rv_match_state != MATCH_OVER)
+		{
 			MatchTest_Fail("overtime", "the match did not end on the overtime frag");
+			MatchTest_Finish();
+			return;
+		}
+		MatchTest_Ok("overtime");
+		// The match statistics, counted since ready-up: the runner's
+		// railgun shot and the overtime frag, the target's mega health.
+		if (mt_runner.rv_stat[MS_SHOTS + WEP_RAILGUN - 1] != 1 || mt_runner.rv_stat[MS_HITS + WEP_RAILGUN - 1] != 1)
+			MatchTest_Fail("stats", "the runner's railgun shot was not counted as one shot and one hit");
+		else if (mt_runner.rv_stat[MS_DAMAGE_DEALT] != 100 || mt_target.rv_stat[MS_DAMAGE_TAKEN] != 100)
+			MatchTest_Fail("stats", strcat("damage dealt ", ftos(mt_runner.rv_stat[MS_DAMAGE_DEALT]), " and taken ",
+				ftos(mt_target.rv_stat[MS_DAMAGE_TAKEN]), ", expected 100"));
+		else if (mt_runner.rv_stat[MS_FRAGS] != 2 || mt_target.rv_stat[MS_DEATHS] != 2
+			|| mt_target.rv_stat[MS_FRAGS] != 1 || mt_runner.rv_stat[MS_DEATHS] != 1)
+			MatchTest_Fail("stats", "frags and deaths were not counted from the match start");
+		else if (mt_target.rv_stat[MS_MEGAS] != 1 || mt_target.rv_stat[MS_HEALTH] != 100)
+			MatchTest_Fail("stats", strcat("target picked up ", ftos(mt_target.rv_stat[MS_HEALTH]), " health, expected one mega health"));
 		else
-			MatchTest_Ok("overtime");
+			MatchTest_Ok("stats");
+		MatchTest_Next(9);
+		return;
+
+	case 9:	// the demo stops a few seconds into the scoreboard
+		if (stats_recording)
+			return;
 		MatchTest_Finish();
 		return;
 	}

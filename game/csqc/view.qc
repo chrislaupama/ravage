@@ -27,9 +27,9 @@ void() View_AddWeapon =
 {
 	local float wep, since_shot;
 
-	if (getstatf(STAT_RV_HEALTH) <= 0 || intermission)
+	if (PlayerStat(STAT_RV_HEALTH) <= 0 || intermission)
 		return;
-	wep = getstatf(STAT_RV_WEAPON);
+	wep = PlayerStat(STAT_RV_WEAPON);
 	if (wep < WEP_SHOTGUN || wep > WEP_COUNT)
 		return;
 	if (wep != view_weapon_num)
@@ -37,7 +37,7 @@ void() View_AddWeapon =
 		setmodel(view_weapon, W_ViewModel(wep));
 		view_weapon_num = wep;
 	}
-	since_shot = time - getstatf(STAT_RV_FIRE_TIME);
+	since_shot = time - PlayerStat(STAT_RV_FIRE_TIME);
 	if (since_shot >= 0 && since_shot < frameduration(view_weapon.modelindex, VIEW_ANIM_FIRE))
 	{
 		view_weapon.frame = VIEW_ANIM_FIRE;
@@ -110,7 +110,7 @@ void() View_Draw =
 {
 	clearscene();
 	setproperty(VF_DRAWENGINESBAR, FALSE);
-	setproperty(VF_DRAWCROSSHAIR, getstatf(STAT_RV_HEALTH) > 0 && !intermission);
+	setproperty(VF_DRAWCROSSHAIR, PlayerStat(STAT_RV_HEALTH) > 0 && !intermission);
 	if (bench_frames)
 		View_BenchFrame();
 	addentities(MASK_ENGINE);

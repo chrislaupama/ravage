@@ -44,11 +44,15 @@ void() worldspawn =
 	// (sv_fullspectate is a RAVAGE engine setting).
 	cvar_set("maxclients", ftos(MATCH_PLAYERS));
 	cvar_set("sv_fullspectate", "1");
+	// Match demos carry the client game code, so they play back after it
+	// changes.
+	cvar_set("sv_demo_write_csqc", "1");
 };
 
 void() StartFrame =
 {
 	Rules_Frame();
+	MatchStats_Frame();
 	SelfTest_Frame();
 	MatchTest_Frame();
 };

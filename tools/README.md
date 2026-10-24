@@ -11,7 +11,7 @@ Development utilities: asset processing, profiling and build tooling.
 | `textures/make_textures.py` | Generates the RAVAGE palette and graybox texture WAD |
 | `assets/import_librequake.py` | Imports LibreQuake's player, weapons, pickups and projectiles, with their animations, and recolours their skins (needs `pip install bpy` and a LibreQuake checkout) |
 | `assets/iqm.py` | The IQM and PNG writers it uses |
-| `assets/make_sounds.py` | Generates the placeholder sounds |
+| `assets/make_sounds.py` | Generates the placeholder out-of-ammo and jump pad sounds |
 | `assets/import_librequake_sounds.py` | Copies the LibreQuake sounds RAVAGE uses (needs a LibreQuake checkout) |
 | `trenchbroom/RAVAGE/` | TrenchBroom game config, entity definitions and compile profile |
 

@@ -21,3 +21,5 @@ bin/
 # Quake commercial assets must never be committed
 id1/
 pak*.pak
+build-*/
+deps/

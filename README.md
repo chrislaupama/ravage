@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/assets/ravage-retro-treatment-v1.png" alt="RAVAGE logo and V emblem" width="960">
+</p>
+
 # RAVAGE
 
 *Fast. Brutal. Relentless.*
@@ -8,6 +12,7 @@ RAVAGE is a standalone, multiplayer-only competitive arena FPS in the tradition 
 
 ## Documents
 
+- [Brand guide and assets](docs/brand/README.md)
 - [Project vision](docs/vision.md)
 - [Working plan](docs/plan.md)
 - [Licensing and asset rules](docs/licensing.md)

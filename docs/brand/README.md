@@ -1,16 +1,16 @@
 # RAVAGE brand guide · v1.0
 
-25 October 2026. The custom motorsport wordmark is approved. The standalone V is a proposed companion icon awaiting approval. Colors, typography and rules below are the proposed brand system. This package does not apply a theme to the game or website.
+25 October 2026. The custom motorsport wordmark is approved. The standalone V and the retro steel title treatment are approved. Colors, typography and rules below are the proposed brand system. This package does not apply a theme to the game or website.
 
 [Visual guide](index.html) · [CSS tokens](tokens.css) · [JSON tokens](tokens.json)
 
 ## Brand idea
 
-Competitive precision. RAVAGE should feel like a sport: fast, controlled and confident. Use strong silhouettes, generous space and direct language. Avoid medieval decoration, distressed metal, mascot shields and excessive neon.
+Competitive precision. RAVAGE should feel like a sport: fast, controlled and confident. Use strong silhouettes, generous space and direct language. Keep interface branding clean. Reserve worn steel and shallow bevels for the approved retro title treatment; avoid medieval decoration, mascot shields and excessive neon.
 
 ## Identity
 
-Use assets/ravage-wordmark-approved.png as the approved appearance reference. Use assets/ravage-icon-concept.png for the proposed square icon. These are generated raster artworks with black backgrounds, not transparent or production vector masters. Earlier Jaro, Cinzel, Chakra and gothic explorations are not brand logos. Never recreate the custom wordmark by typing the name in a font.
+Use assets/ravage-wordmark-approved.png as the approved appearance reference. Use assets/ravage-icon-concept.png for the flat square icon. These are generated raster artworks with black backgrounds, not transparent or production vector masters. Earlier Jaro, Cinzel, Chakra and gothic explorations are not brand logos. Never recreate the custom wordmark by typing the name in a font.
 
 Before shipping, redraw the approved shapes as vector paths, reconcile curves and spacing, optically align the V, and export transparent light/dark SVG and PNG masters plus platform icons. Review those masters against this reference. Do not automatically trace and call the result approved. Current artwork uses a near-white appearance; normalize it to Ivory during vector production.
 
@@ -76,10 +76,10 @@ Short, direct, competitive. Say “Find a match”, “Ready to play”, “Conn
 
 Use tokens.json as the shared source of values and tokens.css as the web-ready equivalent. Native game consumers should map semantic roles to those values in their own UI layer; these files are not automatically wired into the engine. Update both files and this guide together. Keep gameplay color tokens separate from brand tokens. Do not claim the brand theme is implemented until runtime surfaces have been checked.
 
-Release checklist: approve the V and palette; create and review vector masters; export transparent assets and platform icon sizes; check light/dark backgrounds and masks; check contrast and keyboard focus; inspect HUD over real maps; verify font attribution and packaging. No build, deployment or existing game assets were changed by this guide.
+Release checklist: approve the palette; create and review vector masters; export transparent assets and platform icon sizes; check light/dark backgrounds and masks; check contrast and keyboard focus; inspect HUD over real maps; verify font attribution and packaging. No build, deployment or existing game assets were changed by this guide.
 
 Sources: approved artwork from this design session; existing Bone Circuit art reference; Google Fonts Chakra Petch and Barlow, bundled with their SIL Open Font License text. Contrast ratios in the visual guide are calculated from the specified sRGB values, not screenshots.
 
-## Retro title treatment exploration
+## Approved retro title treatment
 
-[Wordmark and icon treatment](assets/ravage-retro-treatment-v1.png): a proposed 1990s arena-shooter finish using worn warm steel and shallow bevels, retaining the established silhouette. This is an unapproved raster exploration for large title and promotional applications. It is an exception to the flat-mark rules only when approved as a separate treatment. Keep flat masters for interface and small-icon use.
+[Wordmark and icon treatment](assets/ravage-retro-treatment-v1.png): the approved 1990s arena-shooter finish using worn warm steel and shallow bevels, retaining the established silhouette. This approved raster treatment is for large title and promotional applications, including the repository README. It is a separate treatment of the flat identity. Keep flat masters for interface and small-icon use.

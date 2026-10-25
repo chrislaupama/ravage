@@ -208,6 +208,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DCMAKE_PREFIX_PATH="$PWD/deps/macos" -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" \
+            -DCMAKE_SYSTEM_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" \
             -DPKG_CONFIG_EXECUTABLE="$(brew --prefix)/bin/pkgconf" \
             -DCMAKE_DISABLE_FIND_PACKAGE_GnuTLS=ON -DCMAKE_DISABLE_FIND_PACKAGE_Fontconfig=ON \
             -DFTE_USE_SDL=ON -DFTE_DEP_JPEG=OFF -DFTE_DEP_VORBISFILE=OFF

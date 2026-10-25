@@ -54,7 +54,8 @@ macos-*)
 	# SDL2 ships inside the app; point the client at it instead of the build tree.
 	cp "$deps/lib/libSDL2-2.0.0.dylib" "$app/Frameworks/"
 	for exe in "$app/MacOS/ravage" "$app/MacOS/ravage-sv"; do
-		otool -l "$exe" | awk '$1 == "path" { print $2 }' | while read -r rpath; do
+		# otool lists a universal binary's rpaths once per architecture.
+		otool -l "$exe" | awk '$1 == "path" { print $2 }' | sort -u | while read -r rpath; do
 			install_name_tool -delete_rpath "$rpath" "$exe"
 		done
 	done

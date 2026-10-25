@@ -6363,6 +6363,26 @@ static int FS_IdentifyDefaultGame(char *newbase, int sizeof_newbase, qboolean fi
 		}
 	}
 
+#ifdef GAME_EXEDIRFILE
+	//RAVAGE: the exe name picked the game, but release packages may be started from any working directory (a shortcut, Finder, a terminal elsewhere).
+	//if the working dir lacks the game's data and the exe's dir (or a macOS bundle's Resources dir) has it, use that instead.
+	if (gamenum != -1 && !fixedbase && host_parms.binarydir && *host_parms.binarydir &&
+		Sys_EnumerateFiles(newbase, GAME_EXEDIRFILE, FS_DirDoesHaveGame, NULL, NULL))
+	{
+		const char *candidates[] = {"", "../Resources/"};
+		for (i = 0; i < countof(candidates); i++)
+		{
+			char dir[MAX_OSPATH];
+			Q_snprintfz(dir, sizeof(dir), "%s%s", host_parms.binarydir, candidates[i]);
+			if (!Sys_EnumerateFiles(dir, GAME_EXEDIRFILE, FS_DirDoesHaveGame, NULL, NULL))
+			{
+				Q_strncpyz(newbase, dir, sizeof_newbase);
+				break;
+			}
+		}
+	}
+#endif
+
 	//identify the game from a telling file in the working directory
 	if (gamenum == -1)
 		gamenum = FS_IdentifyDefaultGameFromDir(newbase);

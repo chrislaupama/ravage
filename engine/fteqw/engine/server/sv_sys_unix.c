@@ -49,6 +49,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <pthread.h>
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>	//RAVAGE: _NSGetExecutablePath
+#include <limits.h>
+#endif
+
 #if defined(__linux__)
 //if we're chrooting, then we need to poke a few other systems to ensure libraries are loaded
 #include "netinc.h"
@@ -1049,6 +1054,18 @@ int main(int argc, char *argv[])
 			if (l > 0)
 			{
 				bindir[l] = 0;
+				*COM_SkipPath(bindir) = 0;
+				printf("Binary is located at \"%s\"\n", bindir);
+				parms.binarydir = bindir;
+			}
+		}
+#elif defined(__APPLE__)
+		{	//RAVAGE: find the exe on macOS too, so release packages find their game data from any working directory
+			char exe[PATH_MAX], resolved[PATH_MAX];
+			uint32_t l = sizeof(exe);
+			if (_NSGetExecutablePath(exe, &l) == 0 && realpath(exe, resolved))
+			{
+				Q_strncpyz(bindir, resolved, sizeof(bindir));
 				*COM_SkipPath(bindir) = 0;
 				printf("Binary is located at \"%s\"\n", bindir);
 				parms.binarydir = bindir;

@@ -50,4 +50,4 @@ tools/package-release.sh linux-x86_64 v0.1.0 build/bin build/game dist
 tests/package.sh dist/ravage-v0.1.0-linux-x86_64
 ```
 
-Windows packages need the dependency prefix as a sixth argument (`deps/win64`) for its license files. macOS packages must be built on a Mac, with the libraries from `tools/build-macos-deps.sh`; the workflow's `macos` job shows the CMake options.
+Windows packages need the dependency prefix as a sixth argument (`deps/win64`) for its license files. macOS packages must be built on a Mac, with the libraries from `tools/build-macos-deps.sh`; the workflow's `macos` job shows the CMake options. Keep its `CMAKE_SYSTEM_IGNORE_PREFIX_PATH` option on a Mac with Homebrew: without it CMake can pick up Homebrew's SDL2, libpng and FreeType, which are arm64 only, and the universal link fails for x86_64.

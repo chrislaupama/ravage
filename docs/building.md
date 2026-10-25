@@ -51,7 +51,7 @@ The map tools are covered in [mapping.md](mapping.md).
 
 ## Running
 
-The programs look for game data in a `base/` folder inside the directory they're started from (the current working directory), not next to the executable. To use data somewhere else, point `-basedir` at the folder that contains `base/`:
+The programs look for game data in a `base/` folder inside the directory they're started from (the current working directory), and if there is none, next to the executable (inside a macOS app, in `Contents/Resources`), which is how release packages run from anywhere. To use data somewhere else, point `-basedir` at the folder that contains `base/`:
 
 ```
 build/bin/ravage -basedir build/game +map duel_graybox
@@ -65,3 +65,5 @@ To use a Quake install you legally own as a local reference, see [licensing.md](
 ## Continuous integration
 
 `.github/workflows/build.yml` builds Linux and Windows on every pull request and push to `main`, runs the tests, and uploads the programs and the game data as build artifacts. On a Windows runner, the Windows server is started and the map pipeline test runs with the Windows builds.
+
+`.github/workflows/release.yml` builds the Linux, Windows and macOS release packages; see [releasing.md](releasing.md).

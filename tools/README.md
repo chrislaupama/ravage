@@ -5,6 +5,9 @@ Development utilities: asset processing, profiling and build tooling.
 | Tool | What it does |
 |---|---|
 | `build-win64-deps.sh` | Cross-compiles the Windows build's libraries with MinGW-w64 |
+| `build-macos-deps.sh` | Builds the macOS build's libraries (SDL2, libpng, FreeType) as universal binaries |
+| `package-release.sh` | Assembles a standalone release package with its license files, see [docs/releasing.md](../docs/releasing.md) |
+| `release/Info.plist` | The macOS app's bundle information |
 | `fetch-ericw-tools.sh` | Downloads the pinned ericw-tools release (qbsp, vis, light) |
 | `build-game-data.sh` | Compiles the server and client game code and every map, and copies models and sounds, into `build/game/base` |
 | `bench-map.sh` | Rendering and whole-frame benchmark for a map, also run in CI |

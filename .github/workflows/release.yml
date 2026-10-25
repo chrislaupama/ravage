@@ -1,0 +1,252 @@
+name: release
+
+# Builds standalone Linux, Windows and macOS packages and attaches them to
+# the GitHub release. Pushing a version tag (v0.1.0, v0.2.0-beta.1, ...)
+# creates the release. Publishing a release with a new tag in the GitHub UI
+# pushes that tag, so it works too. Pull requests that touch the packaging, and manual runs, build and test
+# the packages without releasing them. See docs/releasing.md.
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - tools/package-release.sh
+      - tools/build-macos-deps.sh
+      - tools/release/**
+      - tests/package.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The tag being released, or a dev version for test builds.
+  VERSION: ${{ github.event_name == 'push' && github.ref_name || format('dev-{0}', github.run_number) }}
+
+jobs:
+  game-data:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get -qq update && sudo apt-get -qq install --no-install-recommends ninja-build
+
+      - name: Build the QuakeC compiler
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target fteqcc
+
+      - uses: actions/cache@v4
+        with:
+          path: deps/ericw-tools
+          key: ericw-tools-linux-${{ hashFiles('tools/fetch-ericw-tools.sh') }}
+
+      - name: Fetch map tools
+        run: tools/fetch-ericw-tools.sh
+
+      - name: Build game data
+        run: cmake --build build --target game-data
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-data
+          path: build/game/
+
+  linux:
+    needs: game-data
+    # The oldest supported runner, so the programs run on any distribution
+    # with glibc 2.35 or later.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install --no-install-recommends \
+            ninja-build libsdl2-dev libgl-dev libvulkan-dev libxrandr-dev \
+            libxcursor-dev libjpeg-dev libvorbis-dev libgnutls28-dev \
+            libopus-dev libwayland-dev libxkbcommon-dev libbz2-dev libpng-dev \
+            libfreetype-dev zlib1g-dev
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target fteqw fteqw-sv
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-data
+          path: game
+
+      - name: Package
+        run: tools/package-release.sh linux-x86_64 "$VERSION" build/bin game dist
+
+      - name: Test the package
+        run: tests/package.sh "dist/ravage-$VERSION-linux-x86_64"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-linux
+          path: dist/*.tar.gz
+          compression-level: 0
+
+  windows:
+    needs: game-data
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install --no-install-recommends \
+            ninja-build gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64
+
+      - uses: actions/cache@v4
+        id: deps
+        with:
+          path: deps/win64
+          key: win64-deps-${{ hashFiles('tools/build-win64-deps.sh', 'cmake/mingw-w64-x86_64.cmake') }}
+
+      - name: Build dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: tools/build-win64-deps.sh
+
+      - name: Build
+        env:
+          RAVAGE_WIN64_DEPS: ${{ github.workspace }}/deps/win64
+        run: |
+          cmake -S . -B build-win64 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
+          cmake --build build-win64 --target fteqw fteqw-sv
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-data
+          path: game
+
+      - name: Package
+        run: tools/package-release.sh windows-x86_64 "$VERSION" build-win64/bin game dist deps/win64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-windows
+          path: dist/*.zip
+          compression-level: 0
+
+  windows-test:
+    needs: windows
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-windows
+          path: dist
+
+      - name: Unpack
+        shell: pwsh
+        run: Expand-Archive -Path "dist/ravage-$env:VERSION-windows-x86_64.zip" -DestinationPath dist
+
+      - name: Test the package
+        run: tests/package.sh "dist/ravage-$VERSION-windows-x86_64"
+
+  macos:
+    needs: game-data
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ninja pkgconf
+
+      - uses: actions/cache@v4
+        id: deps
+        with:
+          path: deps/macos
+          key: macos-deps-${{ hashFiles('tools/build-macos-deps.sh') }}
+
+      - name: Build dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: tools/build-macos-deps.sh
+
+      # One universal (Apple silicon and Intel) build for macOS 11 and later,
+      # using only the libraries built above and the ones macOS ships with.
+      - name: Build
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/deps/macos/lib/pkgconfig
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_PREFIX_PATH="$PWD/deps/macos" -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" \
+            -DPKG_CONFIG_EXECUTABLE="$(brew --prefix)/bin/pkgconf" \
+            -DFTE_USE_SDL=ON -DFTE_DEP_GNUTLS=OFF -DFTE_DEP_JPEG=OFF -DFTE_DEP_VORBISFILE=OFF
+          cmake --build build --target fteqw fteqw-sv
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-data
+          path: game
+
+      - name: Package
+        run: tools/package-release.sh macos-universal "$VERSION" build/bin game dist deps/macos
+
+      - name: Check the package
+        run: |
+          app="dist/ravage-$VERSION-macos-universal/RAVAGE.app"
+          lipo -info "$app/Contents/MacOS/ravage" "$app/Contents/MacOS/ravage-sv" "$app/Contents/Frameworks/libSDL2-2.0.0.dylib"
+          otool -L "$app/Contents/MacOS/ravage"
+          # Nothing may load from Homebrew or the build tree.
+          ! otool -L "$app/Contents/MacOS/ravage" "$app/Contents/MacOS/ravage-sv" | grep -E '/opt/homebrew|/usr/local|deps/'
+          codesign --verify --deep --strict "$app"
+
+      - name: Test the package
+        run: tests/package.sh "dist/ravage-$VERSION-macos-universal"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-macos
+          path: dist/*.zip
+          compression-level: 0
+
+  publish:
+    if: github.event_name == 'push'
+    needs: [linux, windows-test, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum ./* | sed 's| \./| |' > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # A pushed tag gets a new release; a tag with a hyphen (v0.2.0-beta.1)
+          # is marked as a pre-release.
+          if ! gh release view "$VERSION" > /dev/null 2>&1; then
+            flags=
+            case $VERSION in *-*) flags=--prerelease ;; esac
+            gh release create "$VERSION" --verify-tag --generate-notes --title "RAVAGE $VERSION" $flags
+          fi
+          gh release upload "$VERSION" dist/* --clobber

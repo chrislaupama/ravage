@@ -12,19 +12,11 @@
 #   deps-dir   prefix from tools/build-win64-deps.sh or build-macos-deps.sh,
 #              whose src/ folder has the bundled libraries' license files
 #
-# macOS signing, from the environment (all optional):
-#   MACOS_SIGN_IDENTITY   a Developer ID Application identity in the keychain;
-#                         without it the app gets an ad-hoc signature
-#   MACOS_NOTARY_KEY, MACOS_NOTARY_KEY_ID, MACOS_NOTARY_ISSUER
-#                         an App Store Connect API key (.p8 file), its key ID
-#                         and issuer ID; with them the signed app is notarized
-#                         and the ticket stapled to it
-#
 # Writes <out-dir>/ravage-<version>-<platform>/ and next to it a .tar.gz
 # (Linux) or .zip (Windows, macOS). macOS packages must be built on macOS.
 set -eu
 
-[ $# -ge 5 ] || { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[ $# -ge 5 ] || { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 platform=$1
 version=$2
 bin=$(cd "$3" && pwd)
@@ -86,36 +78,12 @@ cp -R "$game/base" "$data/"
 rm -f "$data/base/"*.pem
 rm -rf "$data/base/data"
 
-notarized=false
 if [ "${platform%%-*}" = macos ]; then
-	# Sign once the bundle is complete, libraries and helper first. Without a
-	# Developer ID it's an ad-hoc signature, which Apple silicon needs to run
-	# the code at all, but Gatekeeper then asks on first launch.
-	if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
-		sign() { codesign --force --timestamp --options runtime --sign "$MACOS_SIGN_IDENTITY" "$@"; }
-	else
-		sign() { codesign --force --sign - "$@"; }
-	fi
-	sign "$app/Frameworks/"*.dylib "$app/MacOS/ravage-sv"
-	sign "$pkg/RAVAGE.app"
-	if [ -n "${MACOS_SIGN_IDENTITY:-}" ] && [ -n "${MACOS_NOTARY_KEY:-}" ]; then
-		ditto -c -k --keepParent "$pkg/RAVAGE.app" "$out/notarize.zip"
-		xcrun notarytool submit "$out/notarize.zip" --wait --timeout 30m \
-			--key "$MACOS_NOTARY_KEY" --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER" \
-			--output-format json > "$out/notarize.json" || true
-		rm -f "$out/notarize.zip"
-		if ! grep -q '"status" *: *"Accepted"' "$out/notarize.json"; then
-			cat "$out/notarize.json" >&2
-			id=$(sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' "$out/notarize.json")
-			[ -z "$id" ] || xcrun notarytool log "$id" --key "$MACOS_NOTARY_KEY" \
-				--key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER" >&2 || true
-			echo "notarization failed" >&2
-			exit 1
-		fi
-		rm -f "$out/notarize.json"
-		xcrun stapler staple "$pkg/RAVAGE.app"
-		notarized=true
-	fi
+	# Ad-hoc signature, once the bundle is complete: Apple silicon only runs
+	# signed code. It isn't tied to any developer identity, so Gatekeeper asks
+	# on first launch.
+	codesign --force --sign - "$app/Frameworks/"*.dylib "$app/MacOS/ravage-sv"
+	codesign --force --sign - "$pkg/RAVAGE.app"
 fi
 
 # Licenses. The engine is GPL; the source for this exact build is the
@@ -159,8 +127,7 @@ windows-*) run="Run ravage.exe to play, or ravage-sv.exe +map duel_graybox to ho
 server. Windows 10 or later, 64-bit. Windows may warn that the programs are
 from an unknown publisher; choose More info, then Run anyway." ;;
 macos-*) run="Open RAVAGE.app to play, or run ./ravage-sv +map duel_graybox in Terminal to host
-a dedicated server. macOS 11 or later, Apple silicon or Intel."
-	$notarized || run="$run
+a dedicated server. macOS 11 or later, Apple silicon or Intel.
 
 This build is not notarized by Apple, so macOS blocks it the first time.
 Open it once, then go to System Settings > Privacy & Security and choose

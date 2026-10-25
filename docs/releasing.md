@@ -37,28 +37,9 @@ The programs look for `base/` in the working directory first, then next to the e
 
 ![The Linux package, unpacked and started from another folder, in the arena](images/release-linux-package.png)
 
-## macOS signing and notarization
+## macOS signing
 
-With the secrets below, release builds sign the app with your Developer ID, notarizes it with Apple and staples the ticket, so it opens like any downloaded Mac app. Without them it falls back to an ad-hoc signature: macOS then blocks the app on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, and the README says so.
-
-Keep them in a GitHub environment rather than as plain repository secrets, so only release tags can use them: in the repository's Settings > Environments, create an environment named `release`, under Deployment branches and tags choose *Selected branches and tags* and add the tag rule `v*`, then add these as its environment secrets:
-
-| Secret | What it is |
-|---|---|
-| `MACOS_CERTIFICATE` | Your **Developer ID Application** certificate and its private key, exported from Keychain Access as a `.p12` file and base64-encoded: `base64 -i ravage.p12 \| pbcopy` |
-| `MACOS_CERTIFICATE_PASSWORD` | The password you gave the `.p12` export |
-| `APPLE_API_KEY` | An App Store Connect API key for notarization: the contents of the `.p8` file |
-| `APPLE_API_KEY_ID` | That key's Key ID |
-| `APPLE_API_ISSUER` | The Issuer ID shown above the keys list |
-
-To get them:
-
-1. **Certificate.** In Xcode, Settings > Accounts > your team > Manage Certificates, add a *Developer ID Application* certificate (or create one at developer.apple.com > Certificates; only the account holder can). In Keychain Access, find "Developer ID Application: …" under My Certificates, right-click > Export, save as `.p12` with a password.
-2. **API key.** At appstoreconnect.apple.com > Users and Access > Integrations > App Store Connect API, generate a key with the *Developer* role and download the `.p8` (it can be downloaded only once).
-
-The next release tag gets a signed, notarized app; the `macos` job checks it with `spctl`, as Gatekeeper would. To try it without publishing, run the workflow by hand on an existing tag (Run workflow, then pick the tag). Pull requests and branches build with the ad-hoc signature, since the environment refuses them.
-
-The certificate and key carry your developer identity, so if one leaks, revoke it at developer.apple.com (certificate) or App Store Connect (key) and replace the secret. GitHub never passes secrets to pull requests from forks, and the environment keeps them from branch workflows, but anyone with write access could still push a `v*` tag, so give that access only to people you trust with releases.
+The app has an ad-hoc signature, which Apple silicon needs to run it but which isn't tied to any developer identity. It isn't notarized, so macOS blocks it on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, as the README explains. Signing with a Developer ID and notarizing would remove that step, but RAVAGE doesn't do it for now: it would put a personal Apple developer identity on every build and its certificate into CI.
 
 ## Building a package locally
 

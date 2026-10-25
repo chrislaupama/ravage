@@ -23,6 +23,8 @@ To try the packages without releasing, run the workflow by hand from the Actions
 | `ravage-<version>-windows-x86_64.zip` | `ravage.exe`, `ravage-sv.exe` and `base/`. Windows 10 or later; needs no extra DLLs. |
 | `ravage-<version>-macos-universal.zip` | `RAVAGE.app` (Apple silicon and Intel, macOS 11 or later) with the server and game data inside, and a `ravage-sv` link to the server. |
 
+![What a Linux package holds, and its package test](images/release-package-contents.png)
+
 Each one also holds:
 
 - `README.txt`: how to run the game and server, and the credits.
@@ -32,6 +34,8 @@ Each one also holds:
 Packages never contain Quake assets, the QuakeC compiler or the map tools. `tests/package.sh` checks each package for the license files and for Quake files, and checks that the server loads `duel_graybox` and the client finds the package's game data when started from another folder. It also runs under `ctest` with a Linux package built from `build/`.
 
 The programs look for `base/` in the working directory first, then next to the executable (inside a macOS app, in `Contents/Resources`). So a package runs from a shortcut, from Finder or from any terminal folder, and `-basedir` still overrides both.
+
+![The Linux package, unpacked and started from another folder, in the arena](images/release-linux-package.png)
 
 ## macOS signing
 

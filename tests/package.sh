@@ -64,7 +64,7 @@ fi
 for f in README.txt LICENSE.txt licenses/LibreQuake-LICENSE.txt licenses/LibreQuake-CREDITS.txt; do
 	[ -s "$pkg/$f" ] || bad "missing $f"
 done
-for f in qwprogs.dat csprogs.dat gfx/palette.lmp maps/duel_graybox.bsp models/player.iqm; do
+for f in default.cfg qwprogs.dat csprogs.dat gfx/palette.lmp maps/duel_graybox.bsp models/player.iqm; do
 	[ -s "$data/base/$f" ] || bad "missing base/$f"
 done
 for f in "$server" "$client"; do
@@ -97,6 +97,25 @@ if ! $windows; then
 		printf '%s\n' "$out"
 	else
 		echo "ok   ravage uses the package's game data"
+	fi
+
+	# With no +map or +connect, the client must start the arena by itself
+	# (default.cfg's f_startup) rather than sit on a black screen.
+	# It never quits by itself, so stop it once the self-test line shows up.
+	log=$scratch/startup.log
+	"$client" -nohome +set vid_renderer headless +set s_device none >"$log" 2>&1 </dev/null &
+	pid=$!
+	for _ in $(seq 60); do
+		! grep -q 'RAVAGE selftest: map=duel_graybox' "$log" || break
+		sleep 0.5
+	done
+	kill "$pid" 2>/dev/null || true
+	wait "$pid" 2>/dev/null || true
+	if ! grep -q 'RAVAGE selftest: map=duel_graybox .* errors=0' "$log"; then
+		bad "ravage did not start duel_graybox when launched without commands"
+		cat "$log"
+	else
+		echo "ok   ravage starts the arena when launched without commands"
 	fi
 fi
 

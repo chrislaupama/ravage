@@ -143,6 +143,11 @@ one graybox Duel arena, duel_graybox.
 
 $run
 
+The game starts straight into the arena. Controls: WASD to move, mouse to
+aim, left click to fire, space or right click to jump, 1-6 or the mouse
+wheel to change weapon, Tab for scores, F3 to ready up, \` for the console.
+To join someone else's server, open the console and type connect <address>.
+
 Everything needed to play is in this package. It contains no Quake game
 assets and does not need Quake installed.
 

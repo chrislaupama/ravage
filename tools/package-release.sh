@@ -69,7 +69,10 @@ macos-*)
 		done
 		install_name_tool -add_rpath @executable_path/../Frameworks "$exe"
 	done
-	sed -e "s/@VERSION@/${version#v}/g" "$root/tools/release/Info.plist" > "$app/Info.plist"
+	# Bundle versions must be numbers (three for the short one), so v0.2.0-beta.1
+	# becomes 0.2.0, and dev builds 0.0.0.
+	bundle_version=$(printf '%s\n' "${version#v}" | sed -n 's/^\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\).*/\1/p')
+	sed -e "s/@VERSION@/${bundle_version:-0.0.0}/g" "$root/tools/release/Info.plist" > "$app/Info.plist"
 	ln -s RAVAGE.app/Contents/MacOS/ravage-sv "$pkg/ravage-sv"
 	data=$app/Resources
 	;;
@@ -150,7 +153,8 @@ esac
 case $platform in
 linux-*) run="Run ./ravage to play, or ./ravage-sv +map duel_graybox to host a dedicated server.
 The programs need glibc 2.35 or later (Ubuntu 22.04, Debian 12, Fedora 36,
-SteamOS 3 or newer), SDL2 and OpenGL." ;;
+SteamOS 3 or newer). The game also needs SDL2, OpenGL, libpng and fontconfig,
+which desktop installs have; the server needs only zlib." ;;
 windows-*) run="Run ravage.exe to play, or ravage-sv.exe +map duel_graybox to host a dedicated
 server. Windows 10 or later, 64-bit. Windows may warn that the programs are
 from an unknown publisher; choose More info, then Run anyway." ;;

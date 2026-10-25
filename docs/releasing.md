@@ -19,7 +19,7 @@ To try the packages without releasing, run the workflow by hand from the Actions
 
 | Package | Contents |
 |---|---|
-| `ravage-<version>-linux-x86_64.tar.gz` | `ravage`, `ravage-sv` and `base/`. Needs glibc 2.35 or later (Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3 or newer), with SDL2 and OpenGL from the system. |
+| `ravage-<version>-linux-x86_64.tar.gz` | `ravage`, `ravage-sv` and `base/`. Needs glibc 2.35 or later (Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3 or newer). The game uses the system's SDL2, OpenGL, libpng and fontconfig; the server needs only zlib. CI checks the programs link nothing else. |
 | `ravage-<version>-windows-x86_64.zip` | `ravage.exe`, `ravage-sv.exe` and `base/`. Windows 10 or later; needs no extra DLLs. |
 | `ravage-<version>-macos-universal.zip` | `RAVAGE.app` (Apple silicon and Intel, macOS 11 or later) with the server and game data inside, and a `ravage-sv` link to the server. |
 
@@ -39,9 +39,9 @@ The programs look for `base/` in the working directory first, then next to the e
 
 ## macOS signing and notarization
 
-With the repository secrets below, the workflow signs the app with your Developer ID, notarizes it with Apple and staples the ticket, so it opens like any downloaded Mac app. Without them it falls back to an ad-hoc signature: macOS then blocks the app on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, and the README says so.
+With the secrets below, release builds sign the app with your Developer ID, notarizes it with Apple and staples the ticket, so it opens like any downloaded Mac app. Without them it falls back to an ad-hoc signature: macOS then blocks the app on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, and the README says so.
 
-Add them under the repository's Settings > Secrets and variables > Actions:
+Keep them in a GitHub environment rather than as plain repository secrets, so only release tags can use them: in the repository's Settings > Environments, create an environment named `release`, under Deployment branches and tags choose *Selected branches and tags* and add the tag rule `v*`, then add these as its environment secrets:
 
 | Secret | What it is |
 |---|---|
@@ -56,7 +56,9 @@ To get them:
 1. **Certificate.** In Xcode, Settings > Accounts > your team > Manage Certificates, add a *Developer ID Application* certificate (or create one at developer.apple.com > Certificates; only the account holder can). In Keychain Access, find "Developer ID Application: …" under My Certificates, right-click > Export, save as `.p12` with a password.
 2. **API key.** At appstoreconnect.apple.com > Users and Access > Integrations > App Store Connect API, generate a key with the *Developer* role and download the `.p8` (it can be downloaded only once).
 
-The next run of the workflow signs and notarizes; its `macos` job checks the result with `spctl`, as Gatekeeper would. Pull requests that change the packaging get signed builds too, since the secrets are available to branches in this repository.
+The next release tag gets a signed, notarized app; the `macos` job checks it with `spctl`, as Gatekeeper would. To try it without publishing, run the workflow by hand on an existing tag (Run workflow, then pick the tag). Pull requests and branches build with the ad-hoc signature, since the environment refuses them.
+
+The certificate and key carry your developer identity, so if one leaks, revoke it at developer.apple.com (certificate) or App Store Connect (key) and replace the secret. GitHub never passes secrets to pull requests from forks, and the environment keeps them from branch workflows, but anyone with write access could still push a `v*` tag, so give that access only to people you trust with releases.
 
 ## Building a package locally
 

@@ -78,8 +78,23 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFTE_DEP_BZIP2=OFF
           cmake --build build --target fteqw fteqw-sv
+
+      # Everything else (SDL2, OpenGL, audio, GnuTLS) is loaded at run time
+      # if present. Each library here must be one every desktop distribution
+      # ships under this name; libbz2.so.1.0, for one, is Debian's name only.
+      - name: Check runtime libraries
+        run: |
+          allowed='libc.so.6 libm.so.6 libz.so.1 libpng16.so.16 libfontconfig.so.1'
+          for exe in build/bin/ravage build/bin/ravage-sv; do
+            for lib in $(readelf -d "$exe" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p'); do
+              case " $allowed " in
+              *" $lib "*) ;;
+              *) echo "$exe needs $lib, which isn't on every distribution" >&2; exit 1 ;;
+              esac
+            done
+          done
 
       - uses: actions/download-artifact@v4
         with:
@@ -166,10 +181,13 @@ jobs:
   macos:
     needs: game-data
     runs-on: macos-15
+    # The signing secrets live in the release environment, which only v* tags
+    # may use, so pull requests and branches never see them.
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
     env:
-      # Developer ID signing and notarization run when these repository
-      # secrets are set (see docs/releasing.md); otherwise the app gets an
-      # ad-hoc signature.
+      # Developer ID signing and notarization run when the release
+      # environment's secrets are set (see docs/releasing.md); otherwise the
+      # app gets an ad-hoc signature.
       HAVE_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
       HAVE_NOTARY: ${{ secrets.APPLE_API_KEY != '' }}
     steps:

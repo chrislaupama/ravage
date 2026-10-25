@@ -6,4 +6,5 @@ defs.qc
 ../shared/stats.qc
 view.qc
 hud.qc
+matchstats.qc
 main.qc

@@ -71,5 +71,6 @@ void() W_SelectBest;
 float(float wep) W_HasAmmo;
 void(float wep) W_Fire;
 void() Rules_Frame;
+void() MatchStats_Frame;
 void(entity attacker, entity targ) Rules_Frag;
 void() PutClientInServer;

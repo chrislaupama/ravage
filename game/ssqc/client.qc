@@ -13,6 +13,7 @@ void() SetChangeParms =
 void() ClientConnect =
 {
 	bprint(PRINT_HIGH, self.netname, " entered the arena\n");
+	MatchStats_Reset(self);
 };
 
 void() ClientDisconnect =

@@ -23,6 +23,7 @@
 
 void(entity attacker, entity targ) Rules_Frag =
 {
+	MatchStats_Frag(attacker, targ);
 	if (attacker == targ || attacker.classname != "player")
 	{
 		targ.frags = targ.frags - 1;
@@ -43,6 +44,7 @@ void() Rules_StartIntermission =
 	rv_match_state = MATCH_OVER;
 	rv_match_time = 0;
 	rv_intermission = time;
+	MatchStats_EndMatch();
 	rv_intermission_exit = time + 5;
 	rv_intermission_spot = find(world, classname, "info_intermission");
 	if (!rv_intermission_spot)
@@ -100,6 +102,7 @@ void() Rules_StartMatch =
 		PutClientInServer();
 	}
 	self = oldself;
+	MatchStats_StartMatch();
 	bprint(PRINT_HIGH, "FIGHT!\n");
 };
 
@@ -169,6 +172,7 @@ void() Rules_Frame =
 			rv_match_state = MATCH_PLAYING;
 			rv_match_start = 0;
 			rv_match_time = cvar("timelimit") > 0 ? cvar("timelimit") * 60 : 0;
+			MatchStats_StartMatch();
 		}
 		else if (rv_players == MATCH_PLAYERS && rv_ready_count == MATCH_PLAYERS)
 		{

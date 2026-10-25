@@ -63,6 +63,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	targ.dmg_take = targ.dmg_take + take;
 	targ.dmg_save = targ.dmg_save + save;
 	targ.dmg_inflictor = inflictor;
+	MatchStats_Damage(targ, inflictor, attacker, min(take, max(targ.health, 0)) + save);
 	targ.health = targ.health - take;
 
 	if (targ.health <= 0)

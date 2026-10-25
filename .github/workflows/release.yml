@@ -183,16 +183,19 @@ jobs:
         run: tools/build-macos-deps.sh
 
       # One universal (Apple silicon and Intel) build for macOS 11 and later,
-      # using only the libraries built above and the ones macOS ships with.
+      # using only the libraries built above and the ones macOS ships with,
+      # never Homebrew's. With GnuTLS not found the engine builds without it
+      # (FTE_DEP_GNUTLS=OFF would still compile its TLS code).
       - name: Build
         env:
-          PKG_CONFIG_PATH: ${{ github.workspace }}/deps/macos/lib/pkgconfig
+          PKG_CONFIG_LIBDIR: ${{ github.workspace }}/deps/macos/lib/pkgconfig
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DCMAKE_PREFIX_PATH="$PWD/deps/macos" -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" \
             -DPKG_CONFIG_EXECUTABLE="$(brew --prefix)/bin/pkgconf" \
-            -DFTE_USE_SDL=ON -DFTE_DEP_GNUTLS=OFF -DFTE_DEP_JPEG=OFF -DFTE_DEP_VORBISFILE=OFF
+            -DCMAKE_DISABLE_FIND_PACKAGE_GnuTLS=ON -DCMAKE_DISABLE_FIND_PACKAGE_Fontconfig=ON \
+            -DFTE_USE_SDL=ON -DFTE_DEP_JPEG=OFF -DFTE_DEP_VORBISFILE=OFF
           cmake --build build --target fteqw fteqw-sv
 
       - uses: actions/download-artifact@v4

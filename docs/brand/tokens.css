@@ -1,0 +1,41 @@
+:root {
+  --rv-background: var(--rv-black);
+  --rv-panel: var(--rv-surface);
+  --rv-text: var(--rv-ivory);
+  --rv-text-secondary: var(--rv-muted);
+  --rv-action: var(--rv-red);
+  --rv-action-text: var(--rv-black);
+  --rv-focus: var(--rv-cyan);
+  --rv-error: var(--rv-red);
+
+  --rv-black: #080A0D;
+  --rv-surface: #14181E;
+  --rv-raised: #202630;
+  --rv-border: #647080;
+  --rv-ivory: #F5F1E8;
+  --rv-muted: #A5AFBD;
+  --rv-red: #F04438;
+  --rv-red-hover: #FF655A;
+  --rv-cyan: #55D9F5;
+  --rv-success: #73D49B;
+  --rv-warning: #F4C35A;
+  --rv-space-4: 4px;
+  --rv-space-8: 8px;
+  --rv-space-12: 12px;
+  --rv-space-16: 16px;
+  --rv-space-24: 24px;
+  --rv-space-32: 32px;
+  --rv-space-48: 48px;
+  --rv-space-64: 64px;
+  --rv-space-96: 96px;
+  --rv-radius-control: 4px;
+  --rv-radius-panel: 8px;
+  --rv-font-display: "Chakra Petch", sans-serif;
+  --rv-font-body: "Barlow", system-ui, sans-serif;
+  --rv-font-data: ui-monospace, monospace;
+}
+
+/* Import this file from its packaged location so relative font URLs resolve. */
+@font-face { font-family: 'Chakra Petch'; src: url('assets/ChakraPetch-BoldItalic.ttf') format('truetype'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Barlow'; src: url('assets/Barlow-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Barlow'; src: url('assets/Barlow-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }

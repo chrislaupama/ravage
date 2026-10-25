@@ -1,10 +1,10 @@
 #!/bin/sh
-# Asset test: the committed sounds match what tools/assets/ generates (so
+# Asset test: committed sounds and skins match what tools/assets/ generates (so
 # nobody edits a generated file by hand or forgets to regenerate), and every
 # model or sound the game code names exists in content/. The models come
-# from import_librequake.py, which needs Blender and LibreQuake to
-# regenerate, so they are only checked for being there, with their skins
-# and LibreQuake's license.
+# from import_librequake.py; geometry conversion needs Blender and LibreQuake,
+# but the skins rebuild with standard Python from committed source textures.
+# Model references, skin paths and LibreQuake's license are checked too.
 #
 #   tests/assets.sh
 set -eu
@@ -25,6 +25,22 @@ done
 for file in LICENSE.librequake CREDITS.librequake; do
 	[ -f "$root/content/models/$file" ] || { echo "FAIL missing content/models/$file"; fail=1; }
 done
+
+# Bone Circuit skins rebuild without Blender. Compare the complete file set
+# too: a removed emissive map must not linger and light an entire surface.
+"$python" "$root/tools/assets/import_librequake.py" --skins-only "$work/skins" > /dev/null
+(cd "$root/content" && find models -name '*.png' | sort) > "$work/committed-skins"
+(cd "$work/skins" && find models -name '*.png' | sort) > "$work/generated-skins"
+if ! cmp -s "$work/committed-skins" "$work/generated-skins"; then
+	echo "FAIL model skin file set differs; rerun import_librequake.py --skins-only"
+	fail=1
+fi
+while IFS= read -r file; do
+	if ! cmp -s "$root/content/$file" "$work/skins/$file"; then
+		echo "FAIL content/$file differs from the Bone Circuit generator"
+		fail=1
+	fi
+done < "$work/generated-skins"
 
 # Each model names its skin (an IQM mesh's material, an MD3 surface's
 # shader), which the engine loads from <skin>.png. A missing one would

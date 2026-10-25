@@ -12,6 +12,13 @@ Original maps, models, materials, effects and audio.
 
 See [docs/mapping.md](../docs/mapping.md) for the map workflow.
 
-The generated files are committed so the game builds without Python. Don't edit them by hand: change the script and run it again. `tests/assets.sh` (run by `ctest`) fails when they are out of date. The LibreQuake import needs Blender's Python module and a LibreQuake checkout, so the test only checks that its files are present, with their skins.
+The generated files are committed so the game builds without Python. Don't edit them by hand: change the script and run it again. `tests/assets.sh` (run by `ctest`) fails when they are out of date. Mesh conversion needs Blender's Python module and a LibreQuake checkout; the test checks model and skin references without reconverting geometry.
+
+The approved **Bone Circuit** skins rebuild separately, without Blender or a
+LibreQuake checkout: `python3 tools/assets/import_librequake.py --skins-only`.
+Their pinned source textures and UV paint masks live in `tools/assets/source/`;
+the asset test regenerates and compares every skin, including the emissive file
+set. Model geometry and animations are unchanged by this command. See the
+[art reference and actual mesh previews](../docs/art/bone-circuit/README.md).
 
 Everything here must be original or properly licensed for RAVAGE, and third-party content keeps its license and credits next to it. Do not add any id Software Quake assets (for example `pak0.pak`, `pak1.pak` or anything from `id1/`). See [docs/licensing.md](../docs/licensing.md).

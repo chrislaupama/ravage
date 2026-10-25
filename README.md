@@ -13,6 +13,7 @@ RAVAGE is a standalone, multiplayer-only competitive arena FPS in the tradition 
 - [Licensing and asset rules](docs/licensing.md)
 - [Building RAVAGE](docs/building.md)
 - [Making maps](docs/mapping.md)
+- [Releasing](docs/releasing.md)
 
 ## Repository layout
 

@@ -24,6 +24,12 @@ void() Stats_Register =
 	clientstat(STAT_RV_AMMO + WEP_GRENADE - 1, EV_FLOAT, ammo_grenades);
 	clientstat(STAT_RV_AMMO + WEP_LIGHTNING - 1, EV_FLOAT, ammo_cells);
 	clientstat(STAT_RV_AMMO + WEP_RAILGUN - 1, EV_FLOAT, ammo_slugs);
+	clientstat(STAT_RV_READY, EV_FLOAT, rv_ready);
+	globalstat(STAT_RV_MATCH_STATE, EV_FLOAT, "rv_match_state");
+	globalstat(STAT_RV_MATCH_TIME, EV_FLOAT, "rv_match_time");
+	globalstat(STAT_RV_MATCH_START, EV_FLOAT, "rv_match_start");
+	globalstat(STAT_RV_READY_COUNT, EV_FLOAT, "rv_ready_count");
+	globalstat(STAT_RV_PLAYERS, EV_FLOAT, "rv_players");
 };
 
 void() worldspawn =
@@ -33,11 +39,20 @@ void() worldspawn =
 	Assets_Precache();
 	Stats_Register();
 	rv_intermission = 0;
+	rv_match_state = MATCH_WARMUP;
+	// A Duel is one on one: anyone else who connects spectates
+	// (sv_fullspectate is a RAVAGE engine setting).
+	cvar_set("maxclients", ftos(MATCH_PLAYERS));
+	cvar_set("sv_fullspectate", "1");
+	// Match demos carry the client game code, so they play back after it
+	// changes.
+	cvar_set("sv_demo_write_csqc", "1");
 };
 
 void() StartFrame =
 {
 	Rules_Frame();
+	MatchStats_Frame();
 	SelfTest_Frame();
 	MatchTest_Frame();
 };

@@ -15,13 +15,18 @@ void() Item_Respawn =
 
 void() Item_Touch =
 {
+	local float old_health, old_armor;
+
 	if (other.classname != "player" || other.health <= 0 || rv_intermission)
 		return;
 
+	old_health = other.health;
+	old_armor = other.armorvalue;
 	rv_taken = FALSE;
 	self.rv_give();
 	if (!rv_taken)
 		return;
+	MatchStats_Pickup(other, self, other.health - old_health, other.armorvalue - old_armor);
 
 	sprint(other, PRINT_LOW, "You got ", self.netname, "\n");
 	sound(other, CHAN_ITEM, self.noise, 1, ATTN_NORM);

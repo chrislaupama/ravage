@@ -2,8 +2,11 @@
 # Two-client match test: compile the game data, start a headless dedicated
 # server on duel_graybox, connect two real headless clients ("runner" holds
 # forward, "target" stands still), and let the game code's match test check
-# spawns, collision, pickups, combat and respawn (game/ssqc/matchtest.qc).
-# Finally the target's client prints the stats its HUD shows.
+# ready-up, spawns, collision, pickups, combat, respawn, overtime and the
+# match statistics (game/ssqc/matchtest.qc). The target's client prints
+# the stats its HUD shows. A third client, "watcher", joins the full
+# server as a spectator. Last, the server's recording of the match must
+# play back to its end.
 #
 #   tests/match.sh <bin-dir>
 #
@@ -54,6 +57,9 @@ echo "+forward" > "$base/base/runner.cfg"
 sleep 1
 client target
 client runner +exec runner.cfg
+# Both player slots are taken, so this one spectates.
+sleep 2
+client watcher
 
 status=0
 wait "$server" || status=$?
@@ -77,10 +83,48 @@ if [ "$hud" != "RAVAGE hudtest: health=100 armor=0 weapon=2 ammo=100" ]; then
 	echo "FAIL client HUD stats are wrong"
 	fail=1
 fi
+if ! grep -q "watcher is spectating" "$base/server.log"; then
+	echo "FAIL the third client did not join as a spectator"
+	fail=1
+fi
+
+# The server recorded the match and saved its statistics under the same
+# name. The runner's one railgun shot hit.
+demo=$(cd "$base/base" && ls demos/*.mvd 2>/dev/null | head -1)
+stats=$(ls "$base"/base/data/matches/*.json 2>/dev/null | head -1)
+if [ -z "$demo" ] || [ ! -s "$base/base/$demo" ]; then
+	echo "FAIL the match was not recorded"
+	fail=1
+elif [ "$(basename "$demo" .mvd)" != "$(basename "${stats:-none}" .json)" ]; then
+	echo "FAIL no statistics file for $demo"
+	fail=1
+elif ! grep -q '"Railgun": { "shots": 1, "hits": 1 }' "$stats"; then
+	echo "FAIL the statistics file is wrong:"
+	cat "$stats"
+	fail=1
+else
+	echo "recorded $demo with statistics"
+	# Play it back: the client must reach the end of the match, with the
+	# statistics, and timedemo prints the frame rate when it finishes.
+	timeout 60 "$bin/ravage" -basedir "$base" -nohome +set vid_renderer headless \
+		+set s_device none +set sys_colorconsole 0 +timedemo "$demo" > "$base/playback.log" 2>&1 </dev/null &
+	player=$!
+	pids="$pids $player"
+	for i in $(seq 60); do
+		grep -aq "frames .* seconds" "$base/playback.log" && break
+		sleep 1
+	done
+	grep -a "frames .* seconds" "$base/playback.log" || true
+	if ! grep -aq "Match statistics received for 2 players" "$base/playback.log"; then
+		echo "FAIL the demo did not play back to the end of the match"
+		tail -20 "$base/playback.log"
+		fail=1
+	fi
+fi
 if [ "$fail" -ne 0 ]; then
 	echo "--- server log"
 	cat "$base/server.log"
-	for name in target runner; do
+	for name in target runner watcher; do
 		echo "--- $name log"
 		tail -20 "$base/$name.log"
 	done

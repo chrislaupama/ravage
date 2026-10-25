@@ -199,6 +199,7 @@ void() W_FireRocket =
 	local entity missile;
 
 	missile = W_SpawnMissile(1000, MDL_ROCKET);
+	MatchStats_Missile(missile);
 	missile.classname = "rocket";
 	missile.movetype = MOVETYPE_FLYMISSILE;
 	missile.dmg = 100;
@@ -214,6 +215,7 @@ void() W_FireGrenade =
 	local entity missile;
 
 	missile = W_SpawnMissile(700, MDL_GRENADE);
+	MatchStats_Missile(missile);
 	missile.classname = "grenade";
 	missile.movetype = MOVETYPE_BOUNCE;
 	missile.velocity_z = missile.velocity_z + 200;
@@ -264,6 +266,7 @@ void(float wep) W_Fire =
 	else
 		sound(self, CHAN_WEAPON, W_FireSound(wep), 1, ATTN_NORM);
 
+	MatchStats_FireStart(wep);
 	switch (wep)
 	{
 	case WEP_SHOTGUN:
@@ -286,6 +289,7 @@ void(float wep) W_Fire =
 		W_FireRailgun();
 		break;
 	}
+	MatchStats_FireEnd();
 	W_UpdateCurrentAmmo();
 	if (!W_HasAmmo(self.weapon))
 		W_SelectBest();

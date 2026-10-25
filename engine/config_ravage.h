@@ -18,6 +18,7 @@
 #define GAME_BASEGAMES		"base"			//RAVAGE: game data lives in base/	//comma-separate list of basegame strings to use
 #define GAME_PROTOCOL			"RAVAGE"		//RAVAGE: keeps other FTE games out of the server browser	//so other games won't show up in the server browser
 #define GAME_DEFAULTPORT		27600			//RAVAGE: avoid QuakeWorld's 27500			//slightly reduces the chance of people connecting to the wrong type of server
+#define GAME_EXEDIRFILE		"base/qwprogs.dat"	//RAVAGE: if the working dir lacks this file, look for game data next to the executable (release packages)
 //#define GAME_IDENTIFYINGFILES	NULL			//with multiple games, this string-list gives verification that the basedir is actually valid. if null, will just be assumed correct.
 //#define GAME_DOWNLOADSURL		NULL			//url for the package manger to update from
 //#define GAME_DEFAULTCMDS		NULL			//a string containing the things you want to exec in order to override default.cfg 

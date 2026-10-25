@@ -16,10 +16,10 @@ brush models its health and ammo boxes are built from
                                 their glowing parts
 
 LibreQuake's art is BSD-3 licensed; see content/models/LICENSE.librequake and
-docs/licensing.md. The skins keep LibreQuake's painted detail but swap its
-steampunk palette for RAVAGE's: wood and brass become pale ceramic, iron
-becomes cool gunmetal, and muzzle flashes, the player's visor and other hot
-parts glow in each weapon's energy colour.
+docs/licensing.md. Player and pickup skins retain LibreQuake's painted
+detail with Bone Circuit colours. Weapon surfaces use separately authored
+1024-pixel material maps: clean identity paint, ivory inserts and dark
+mechanisms on the existing UVs. Only flash effects and small status lights glow.
 
 The player's animations are split by the original Quake player frame
 numbers, one IQM animation per action, at 10 frames a second. The game code
@@ -30,8 +30,13 @@ can't store, so the first-person weapons are MD3: every frame of the mesh,
 sampled from Blender. The first frame is the weapon at rest ("idle"), the
 rest its firing animation ("fire"); game/csqc/view.qc plays them.
 
-Needs Blender's Python module ("pip install bpy", a Python version that bpy
-supports) and a LibreQuake checkout:
+To rebuild just the Bone Circuit textures, using the committed normalized
+LibreQuake sources and Python's standard library:
+
+  python import_librequake.py --skins-only [content-dir]
+
+Mesh conversion needs Blender's Python module ("pip install bpy", a Python
+version that bpy supports) and a LibreQuake checkout:
 
   python import_librequake.py <librequake-dir> [content-dir]
 
@@ -40,16 +45,19 @@ LIBREQUAKE_COMMIT is the revision the committed files came from.
 """
 
 import colorsys
+from functools import lru_cache
 import math
 import os
 import re
 import struct
 import sys
 
-import bpy
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from iqm import cross, dot, normalize, png, sub, write_iqm  # noqa: E402
+from iqm import cross, dot, normalize, png, read_png, sub, write_iqm  # noqa: E402
+
+# Imported only for mesh conversion. Skin regeneration uses the committed
+# normalized source images and the Python standard library.
+bpy = None
 
 LIBREQUAKE_COMMIT = 'dd4d5bffcabbcf9ceca32a1d83829109928c3f08'
 
@@ -89,8 +97,8 @@ def ramp(stops, t):
     return lerp(stops[i], stops[i + 1], t - i)
 
 
-ARMOUR = [(30, 34, 42), (96, 104, 116), (170, 178, 190), (226, 231, 238)]
-SUIT = [(10, 12, 16), (30, 35, 44), (62, 70, 84), (98, 108, 124)]
+ARMOUR = [(52, 48, 41), (134, 125, 107), (216, 207, 183), (247, 240, 219)]
+SUIT = [(9, 12, 16), (25, 30, 36), (49, 57, 64), (81, 90, 96)]
 LEATHER = [(12, 13, 16), (36, 40, 48), (70, 76, 88)]
 METAL = [(12, 14, 18), (60, 66, 76), (140, 150, 162), (220, 228, 236)]
 GLOW = (80, 220, 255)
@@ -101,6 +109,21 @@ FLASH = [(40, 120, 255), (150, 230, 255), (255, 255, 255)]
 VISOR = (78, 11, 98, 19)
 CHEST_LIGHT = (222, 41, 248, 46)
 FLASH_STRIPS = ((35, 116, 57, 188), (184, 116, 205, 188))
+
+# Painted regions of LibreQuake's player UV sheet. The front and back are
+# laid out beside each other, not mirrored. Keep skin features off the
+# muzzle-flash/weapon islands and the fabric joints.
+PLAYER_PLATES = ((38, 29, 65, 53), (107, 29, 136, 53),
+                 (184, 29, 211, 53), (253, 29, 283, 53),
+                 (7, 72, 34, 108), (117, 72, 140, 108),
+                 (153, 72, 180, 108), (263, 72, 290, 108),
+                 (66, 145, 111, 176), (212, 145, 257, 176))
+
+
+def painted(colour, value):
+    """Readable matte paint retaining the source's shading and edge wear."""
+    return ramp([tuple(c * 0.13 for c in colour), tuple(c * 0.50 for c in colour),
+                 colour, lerp(colour, (255, 250, 235), 0.36)], value)
 
 
 def inside(box, x, y):
@@ -115,10 +138,20 @@ def recolour_player(x, y, rgb):
     if any(inside(box, x, y) for box in FLASH_STRIPS):
         colour = ramp(FLASH, v * v)
         return colour, colour
-    if inside(VISOR, x, y) or (inside(CHEST_LIGHT, x, y) and s > 0.3):
+    if inside(VISOR, x, y) or (inside(CHEST_LIGHT, x, y) and 232 <= x < 236 and s > 0.3):
         # Keep the painted grille: darker pixels glow less.
         colour = tuple(c * min(1.0, 0.35 + v) for c in GLOW)
         return colour, tuple(c * 0.5 for c in colour)
+    # Circuit's broad dark V, painted over the existing breastplate UVs.
+    if 59 <= x <= 113 and 32 <= y <= 73 and 25 <= hue < 78 and s > 0.25:
+        edge = 54 - abs(x - 86) * 0.65
+        if abs(y - edge) < 4:
+            return ramp(SUIT, min(1, v * 1.4)), None
+        # Two short cyan status insets, not a glowing outline.
+        if (60 <= x <= 63 or 109 <= x <= 112) and 40 <= y <= 48:
+            return GLOW, tuple(c * 0.4 for c in GLOW)
+    if any(inside(box, x, y) for box in PLAYER_PLATES) and v > 0.08:
+        return ramp(ARMOUR, min(1, v * 1.25 + 0.13)), None
     if s < 0.22:
         return ramp(METAL, v * 1.1), None
     if 33 <= hue < 75 and v > 0.12:
@@ -129,7 +162,7 @@ def recolour_player(x, y, rgb):
     return ramp(LEATHER, v * 1.6), None
 
 
-GUNMETAL = [(8, 10, 14), (40, 48, 60), (104, 116, 132), (186, 198, 214), (238, 244, 250)]
+GUNMETAL = [(8, 10, 14), (30, 36, 43), (64, 74, 83), (120, 130, 140), (210, 218, 222)]
 
 
 def brightness_gain(image):
@@ -156,14 +189,17 @@ def weapon_recolour(energy, image):
             colour = lerp(energy, (255, 255, 255), max(0.0, v - 0.75) * 2)
             return colour, tuple(c * 0.5 for c in colour)
         v = min(1.0, v * gain)
-        if 90 <= hue < 200 and s > 0.15:
-            # Green-tinted iron becomes dark metal with energy-lit edges.
-            colour = lerp((14, 18, 24), energy, v ** 2)
-            return colour, (tuple(c * 0.35 for c in colour) if v > 0.6 else None)
-        if 12 <= hue < 65 and s > 0.25:
-            # Wood and brass become ceramic.
-            return ramp(ARMOUR, v * 1.1), None
+        if s > 0.18 and (12 <= hue < 280 or hue >= 340):
+            # Large wood/brass and tinted body panels carry weapon identity.
+            # Only the brightest worn trim is ivory; paint does not glow.
+            if v > 0.88 and s < 0.40:
+                return ramp(ARMOUR, v), None
+            return painted(energy, min(1, v ** 0.65)), None
         if s < 0.3:
+            if energy == (255, 255, 255) and v > 0.22:
+                return painted(energy, v ** 0.65), None
+            if v > 0.66:
+                return ramp(ARMOUR, v), None
             return ramp(GUNMETAL, v), None
         return ramp(LEATHER, v * 1.3), None
     return recolour
@@ -194,11 +230,50 @@ def write_png_pair(out, name, rows, luma_rows):
     png(os.path.join(out, name + '.png'), width, height, rows)
     if any(any(row) for row in luma_rows):
         png(os.path.join(out, name + '_luma.png'), width, height, luma_rows)
+    elif os.path.exists(os.path.join(out, name + '_luma.png')):
+        os.remove(os.path.join(out, name + '_luma.png'))
 
 
 def write_skin(image, recolour, out, name):
     """Write image, recoloured, as <name>.png and <name>_luma.png."""
+    if name.startswith(('v_', 'g_')):
+        weapon = name[2:].removesuffix('_skin')
+        write_weapon_material_skin(out, name, WEAPONS[weapon][1])
+        return
     write_png_pair(out, name, *recoloured(image, recolour))
+
+
+def write_weapon_material_skin(out, name, identity):
+    """Bake authored material IDs and finish values, never old diffuse noise."""
+    path = os.path.join(os.path.dirname(__file__), 'source', 'weapon-materials',
+                        name.removesuffix('_skin') + '.png')
+    _, _, source = read_png(path)
+    palette = {0: (26, 32, 39), 1: identity, 2: (226, 220, 201),
+               3: (39, 47, 56), 4: (110, 125, 138), 5: (17, 23, 29),
+               6: identity, 7: identity, 8: (24, 31, 38),
+               9: (190, 200, 206), 10: tuple(round(c * 0.70) for c in identity)}
+
+    @lru_cache(maxsize=None)
+    def pixel(material, shade, emission):
+        if material not in palette:
+            raise ValueError('unknown weapon material %d in %s' % (material, path))
+        if emission and material not in (6, 7):
+            raise ValueError('emission on a solid weapon material in %s' % path)
+        base = palette[material]
+        colour = bytes(round(c * shade / 255) for c in base)
+        glow = bytes(round(c * emission / 255) for c in base)
+        return colour, glow
+
+    rows, luma = [], []
+    for row in source:
+        diffuse_row, glow_row = bytearray(), bytearray()
+        for material, shade, emission in zip(row[0::3], row[1::3], row[2::3]):
+            colour, glow = pixel(material, shade, emission)
+            diffuse_row.extend(colour)
+            glow_row.extend(glow)
+        rows.append(diffuse_row)
+        luma.append(glow_row)
+    write_png_pair(out, name, rows, luma)
 
 
 #
@@ -308,11 +383,11 @@ def write_player(librequake, out):
 # LibreQuake's super nailgun.
 WEAPONS = {
     'shotgun': ('shot', (255, 150, 60)),
-    'machinegun': ('nail', (255, 170, 70)),
-    'rocketlauncher': ('rock2', (255, 110, 50)),
+    'machinegun': ('nail', (255, 208, 80)),
+    'rocketlauncher': ('rock2', (239, 65, 65)),
     'grenadelauncher': ('rock', (120, 255, 140)),
-    'lightning': ('light', (90, 220, 255)),
-    'railgun': ('nail2', (120, 255, 140)),
+    'lightning': ('light', (255, 255, 255)),
+    'railgun': ('nail2', (90, 220, 255)),
 }
 
 
@@ -436,19 +511,26 @@ def write_mdl_item(librequake, lq, recolour, out, name, skin=0):
 
 
 def armour_recolour(hue, colour):
-    """A recolour for an armor skin: its painted base, of the given hue,
-    becomes plating in colour, with the brightest edges glowing, and the
-    rest becomes gunmetal."""
+    """Matte tier-coloured armor with a Circuit V and ivory trim."""
     def make(image):
         gain = brightness_gain(image)
+        # Authored on the actual armor UVs: red = graphite V; green = ivory
+        # lower trim. The shard has its own silhouette and uses no torso mask.
+        mask_path = os.path.join(os.path.dirname(__file__), 'source', 'armor-circuit-mask.png')
+        mw, mh, mask = read_png(mask_path)
+        use_mask = tuple(image.size) == (mw, mh)
 
         def recolour(x, y, rgb):
             h, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
             v = min(1.0, v * gain)
+            if use_mask and mask[y][x * 3] and v > 0.07:
+                return ramp(SUIT, min(1, v + 0.12)), None
+            if use_mask and mask[y][x * 3 + 1] and v > 0.07:
+                return ramp(ARMOUR, min(1, v + 0.18)), None
             if s > 0.18 and abs((h * 360 - hue + 180) % 360 - 180) < 18:
-                plate = ramp([(10, 12, 16), tuple(c * 0.3 for c in colour), colour,
-                              lerp(colour, (255, 255, 255), 0.35)], v)
-                return plate, (tuple(c * 0.3 for c in colour) if v > 0.8 else None)
+                return painted(colour, min(1, v ** 0.65)), None
+            if s > 0.2 and 15 <= h * 360 < 65:
+                return ramp(ARMOUR, min(1, v + 0.15)), None
             return ramp(GUNMETAL, v), None
         return recolour
     return make
@@ -580,7 +662,45 @@ def split_tiles(polygon, axes):
 TILE_PAD = 4    # texels of repeated texture around each tile in an atlas
 
 
-def write_brush_item(librequake, lq, energy, scale, out, name):
+def pickup_recolour(energy, image, texture, name):
+    """Ceramic frames, coloured panels and category symbols on brush UVs."""
+    gain = brightness_gain(image)
+    health = name.startswith('health')
+
+    def recolour(x, y, rgb):
+        h, s, v = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
+        hue = h * 360
+        v = min(1, v * gain)
+        if health and texture == 'hp25_top2':
+            if (13 <= x < 19 and 5 <= y < 27) or (5 <= x < 27 and 13 <= y < 19):
+                return (241, 234, 213), None
+            return painted(energy, 0.60 + v * 0.30), None
+        if health and '_top' in texture and texture.startswith('+'):
+            # Replace the source's blue caduceus with a readable ivory plus
+            # on its existing inset top panel. These source tiles are 32².
+            if 9 <= x < 24 and 7 <= y < 26:
+                if (14 <= x < 19 and 10 <= y < 23) or (10 <= x < 23 and 14 <= y < 19):
+                    return (241, 234, 213), None
+                return painted(energy, 0.68 + v * 0.22), None
+        if health and s > 0.5 and (hue < 15 or hue > 340):
+            return ramp(ARMOUR, min(1, v + 0.3)), None
+        if s > 0.25:
+            # Functional color covers the large painted inserts. Brown
+            # rails/handles stay warm ivory rather than becoming wood.
+            if 15 <= hue < 65 and not (s > 0.65 and v > 0.65):
+                if not health and 3 <= x < image.size[0] - 3 and 3 <= y < image.size[1] - 3:
+                    return painted(energy, min(1, 0.38 + v * 0.6)), None
+                return ramp(ARMOUR, min(1, v + 0.15)), None
+            colour = painted(energy, min(1, 0.35 + v * 0.65))
+            return colour, (tuple(c * 0.28 for c in energy) if v > 0.90 and s > 0.65 else None)
+        if not health and energy == (255, 255, 255) and v > 0.14:
+            return painted(energy, min(1, 0.35 + v * 0.65)), None
+        return ramp(GUNMETAL, v), None
+
+    return recolour
+
+
+def write_brush_item(librequake, lq, energy, scale, out, name, skins_only=False):
     brushes = read_brushes(os.path.join(librequake, 'lq1', 'maps', 'src', 'brushmodels', lq + '.map'))
     faces = []      # (polygon, face)
     for b, brush in enumerate(brushes):
@@ -604,7 +724,8 @@ def write_brush_item(librequake, lq, energy, scale, out, name):
     # side by side in an atlas. Faces are cut where their texture repeats,
     # so each piece maps onto one copy of it.
     textures = sorted({face[2] for _, face in faces})
-    images = [bpy.data.images.load(texture_path(librequake, t)) for t in textures]
+    images = [(SkinImage.load(texture_path(librequake, t)) if skins_only else
+               bpy.data.images.load(texture_path(librequake, t))) for t in textures]
     size = images[0].size[0]
     assert all(tuple(image.size) == (size, size) for image in images), 'textures must be square and the same size'
     columns = math.ceil(math.sqrt(len(textures)))
@@ -614,17 +735,21 @@ def write_brush_item(librequake, lq, energy, scale, out, name):
     atlas = [[0] * (width * 3) for _ in range(height)]
     luma = [[0] * (width * 3) for _ in range(height)]
     for i, image in enumerate(images):
-        tile, glow = recoloured(image, weapon_recolour(energy, image))
+        tile, glow = recoloured(image, pickup_recolour(energy, image, textures[i], name))
         x0, y0 = (i % columns) * slot, (i // columns) * slot
         for y in range(slot):
             for x in range(slot):
                 sx, sy = (x - TILE_PAD) % size, (y - TILE_PAD) % size
                 atlas[y0 + y][(x0 + x) * 3:(x0 + x) * 3 + 3] = tile[sy][sx * 3:sx * 3 + 3]
                 luma[y0 + y][(x0 + x) * 3:(x0 + x) * 3 + 3] = glow[sy][sx * 3:sx * 3 + 3]
-        bpy.data.images.remove(image)
+        if not skins_only:
+            bpy.data.images.remove(image)
     skins = os.path.join(out, 'pickups')
     os.makedirs(skins, exist_ok=True)
     write_png_pair(skins, name, atlas, luma)
+
+    if skins_only:
+        return
 
     verts, tris = [], []
     for polygon, (normal, _, texture, (u_axis, u_offset), (v_axis, v_offset), (u_scale, v_scale)) in faces:
@@ -672,9 +797,54 @@ def write_items(librequake, out):
         write_brush_item(librequake, lq, energy, scale, out, name)
 
 
+class SkinImage:
+    """Blender's small image interface, backed by normalized RGB sources."""
+
+    def __init__(self, width, height, rows):
+        self.size = width, height
+        self.pixels = [c for row in reversed(rows) for x in range(width)
+                       for c in (*(v / 255 for v in row[x * 3:x * 3 + 3]), 1.0)]
+
+    @classmethod
+    def load(cls, path):
+        return cls(*read_png(path))
+
+
+def write_skins(source, out):
+    """Regenerate all skins without touching geometry or needing Blender."""
+    def image(name, skin=0):
+        return SkinImage.load(os.path.join(source, 'lq1', 'progs', 'src', 'textures',
+                                          '%s.mdl.%d.png' % (name, skin)))
+
+    os.makedirs(out, exist_ok=True)
+    write_skin(image('player'), recolour_player, out, 'player_skin')
+    for name, (lq, energy) in WEAPONS.items():
+        for prefix in ('v_', 'g_'):
+            img = image(prefix + lq)
+            write_skin(img, weapon_recolour(energy, img), out, prefix + name + '_skin')
+    for name, (skin, hue, colour) in ARMOURS.items():
+        img = image('armor', skin)
+        write_skin(img, armour_recolour(hue, colour)(img), out, name + '_skin')
+    img = image('armorshard')
+    write_skin(img, armour_recolour(*SHARD)(img), out, 'armor_shard_skin')
+    for name, (lq, energy) in MDL_ITEMS.items():
+        img = image(lq)
+        write_skin(img, weapon_recolour(energy, img), out, name + '_skin')
+    for name, (lq, energy, scale) in BRUSH_ITEMS.items():
+        write_brush_item(source, lq, energy, scale, out, name, skins_only=True)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == '--skins-only':
+        content = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), '..', '..', 'content')
+        source = os.path.join(os.path.dirname(__file__), 'source', 'librequake')
+        write_skins(source, os.path.join(content, 'models'))
+        print('wrote Bone Circuit skins to %s' % os.path.normpath(content))
+        return
     if len(sys.argv) < 2:
         sys.exit(__doc__)
+    global bpy
+    import bpy
     librequake = sys.argv[1]
     content = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), '..', '..', 'content')
     out = os.path.join(content, 'models')
@@ -684,6 +854,9 @@ def main():
         write_view_weapon(librequake, lq, energy, out, 'v_' + name)
         write_pickup(librequake, lq, energy, out, 'g_' + name)
     write_items(librequake, out)
+    # Canonical byte-RGB texture sources also avoid differences between
+    # packed Blender images and the upstream external PNGs.
+    write_skins(os.path.join(os.path.dirname(__file__), 'source', 'librequake'), out)
     print('wrote the player, %d weapons and %d pickups and projectiles to %s'
           % (len(WEAPONS), len(ARMOURS) + 1 + len(MDL_ITEMS) + len(BRUSH_ITEMS), os.path.normpath(out)))
 

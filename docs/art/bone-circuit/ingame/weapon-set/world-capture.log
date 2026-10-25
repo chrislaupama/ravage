@@ -1,0 +1,27 @@
+Binary is located at "/Users/chrislaupama/Documents/ravage/build-macos/bin/"
+couldn't exec default.cfg
+couldn't exec config.cfg
+
+Engine Version: RAVAGE git-b355721 Oct 25 2026
+execing capture.cfg
+Setting windowed mode 960*540 OpenGL
+GL_VENDOR: Apple
+GL_RENDERER: Apple M4
+GL_VERSION: 2.1 Metal - 91.7
+OpenGL renderer initialized
+------- RAVAGE Initialized -------
+RAVAGE selftest: map=duel_graybox spawns=4 items=20 triggers=0 errors=0
+RAVAGE selftest: PASS
+client Player connected
+
+
+-------------------
+
+[0;mGraybox Duel
+[0;mPlayer entered the arena
+execing scene-world-weapons.cfg
+Skin capture scene 5
+noclip on
+Wrote $basedir/base/skin-capture/world-weapons.png
+Server ended
+Client "Player" removed

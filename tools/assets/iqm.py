@@ -10,6 +10,40 @@ import struct
 import zlib
 
 
+def read_png(path):
+    """Read our deterministic, unfiltered 8-bit RGB asset-source PNGs.
+
+    Kept deliberately narrow: these sources are normalized by png(), not
+    arbitrary artist exports. No Pillow or Blender dependency for skin builds.
+    """
+    data = open(path, 'rb').read()
+    if data[:8] != b'\x89PNG\r\n\x1a\n':
+        raise ValueError('not a PNG: %s' % path)
+    offset, compressed = 8, bytearray()
+    width = height = None
+    while offset < len(data):
+        size, = struct.unpack_from('>I', data, offset)
+        kind = data[offset + 4:offset + 8]
+        body = data[offset + 8:offset + 8 + size]
+        crc, = struct.unpack_from('>I', data, offset + 8 + size)
+        if zlib.crc32(kind + body) != crc:
+            raise ValueError('PNG checksum mismatch: %s' % path)
+        if kind == b'IHDR':
+            width, height, depth, colour, compression, filtering, interlace = struct.unpack('>IIBBBBB', body)
+            if (depth, colour, compression, filtering, interlace) != (8, 2, 0, 0, 0):
+                raise ValueError('expected normalized RGB asset source: %s' % path)
+        elif kind == b'IDAT':
+            compressed.extend(body)
+        elif kind == b'IEND':
+            break
+        offset += size + 12
+    raw = zlib.decompress(compressed)
+    stride = width * 3 + 1
+    if len(raw) != stride * height or any(raw[y * stride] for y in range(height)):
+        raise ValueError('expected unfiltered RGB asset source: %s' % path)
+    return width, height, [raw[y * stride + 1:(y + 1) * stride] for y in range(height)]
+
+
 def png(path, width, height, rows):
     """Write 8-bit RGB rows as a PNG."""
     def chunk(kind, data):

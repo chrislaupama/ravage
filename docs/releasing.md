@@ -37,9 +37,26 @@ The programs look for `base/` in the working directory first, then next to the e
 
 ![The Linux package, unpacked and started from another folder, in the arena](images/release-linux-package.png)
 
-## macOS signing
+## macOS signing and notarization
 
-The app has an ad-hoc signature, not an Apple Developer ID, and isn't notarized. macOS blocks it on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, as the README explains. Removing that step needs an Apple Developer account: the workflow would sign with the Developer ID certificate and send the zip to Apple's notary service.
+With the repository secrets below, the workflow signs the app with your Developer ID, notarizes it with Apple and staples the ticket, so it opens like any downloaded Mac app. Without them it falls back to an ad-hoc signature: macOS then blocks the app on first launch until the player chooses Open Anyway in System Settings > Privacy & Security, and the README says so.
+
+Add them under the repository's Settings > Secrets and variables > Actions:
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERTIFICATE` | Your **Developer ID Application** certificate and its private key, exported from Keychain Access as a `.p12` file and base64-encoded: `base64 -i ravage.p12 \| pbcopy` |
+| `MACOS_CERTIFICATE_PASSWORD` | The password you gave the `.p12` export |
+| `APPLE_API_KEY` | An App Store Connect API key for notarization: the contents of the `.p8` file |
+| `APPLE_API_KEY_ID` | That key's Key ID |
+| `APPLE_API_ISSUER` | The Issuer ID shown above the keys list |
+
+To get them:
+
+1. **Certificate.** In Xcode, Settings > Accounts > your team > Manage Certificates, add a *Developer ID Application* certificate (or create one at developer.apple.com > Certificates; only the account holder can). In Keychain Access, find "Developer ID Application: …" under My Certificates, right-click > Export, save as `.p12` with a password.
+2. **API key.** At appstoreconnect.apple.com > Users and Access > Integrations > App Store Connect API, generate a key with the *Developer* role and download the `.p8` (it can be downloaded only once).
+
+The next run of the workflow signs and notarizes; its `macos` job checks the result with `spctl`, as Gatekeeper would. Pull requests that change the packaging get signed builds too, since the secrets are available to branches in this repository.
 
 ## Building a package locally
 

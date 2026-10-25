@@ -28,8 +28,10 @@ build() { # source-dir extra-cmake-args...
 	cmake -S "$src" -B "$src/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
 		-DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_PREFIX_PATH="$prefix" \
-		-DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" "$@" > "$src/configure.log"
-	cmake --build "$src/build" --target install > "$src/build.log"
+		-DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" "$@" > "$src/configure.log" 2>&1 ||
+		{ cat "$src/configure.log"; exit 1; }
+	cmake --build "$src/build" --target install > "$src/build.log" 2>&1 ||
+		{ tail -50 "$src/build.log"; exit 1; }
 }
 
 fetch https://github.com/libsdl-org/SDL/releases/download/release-2.30.11/SDL2-2.30.11.tar.gz \
@@ -48,7 +50,8 @@ echo "Building SDL2"
 build SDL2-2.30.11 -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF
 
 echo "Building libpng"
-build libpng-1.6.45 -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPNG_TOOLS=OFF -DPNG_FRAMEWORK=OFF
+build libpng-1.6.45 -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPNG_TOOLS=OFF -DPNG_FRAMEWORK=OFF \
+	-DPNG_HARDWARE_OPTIMIZATIONS=OFF
 
 echo "Building FreeType"
 build freetype-2.13.3 -DBUILD_SHARED_LIBS=OFF -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_HARFBUZZ=ON \

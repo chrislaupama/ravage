@@ -51,20 +51,17 @@ macos-*)
 	mkdir -p "$app/MacOS" "$app/Frameworks" "$app/Resources"
 	cp "$bin/ravage" "$bin/ravage-sv" "$app/MacOS/"
 	strip -x "$app/MacOS/ravage" "$app/MacOS/ravage-sv"
-	# SDL2 ships inside the app; point the client at it instead of the build tree.
-	cp "$deps/lib/libSDL2-2.0.0.dylib" "$app/Frameworks/"
+	# SDL2 and epoll-shim ship inside the app; point the programs at them
+	# instead of the build tree.
+	cp "$deps/lib/libSDL2-2.0.0.dylib" "$bin/../_deps/epoll-shim-build/src/libepoll-shim.0.dylib" "$app/Frameworks/"
 	for exe in "$app/MacOS/ravage" "$app/MacOS/ravage-sv"; do
 		# otool lists a universal binary's rpaths once per architecture.
 		otool -l "$exe" | awk '$1 == "path" { print $2 }' | sort -u | while read -r rpath; do
 			install_name_tool -delete_rpath "$rpath" "$exe"
 		done
+		install_name_tool -add_rpath @executable_path/../Frameworks "$exe"
 	done
-	install_name_tool -add_rpath @executable_path/../Frameworks "$app/MacOS/ravage"
 	sed -e "s/@VERSION@/${version#v}/g" "$root/tools/release/Info.plist" > "$app/Info.plist"
-	# Ad-hoc signature: Apple silicon only runs signed code. This is not a
-	# Developer ID signature, so Gatekeeper still asks on first launch.
-	codesign --force --sign - "$app/Frameworks/libSDL2-2.0.0.dylib" "$app/MacOS/ravage-sv"
-	codesign --force --sign - "$pkg/RAVAGE.app"
 	ln -s RAVAGE.app/Contents/MacOS/ravage-sv "$pkg/ravage-sv"
 	data=$app/Resources
 	;;
@@ -77,6 +74,14 @@ cp -R "$game/base" "$data/"
 # Server keys and match records the engine may have written during tests.
 rm -f "$data/base/"*.pem
 rm -rf "$data/base/data"
+
+if [ "${platform%%-*}" = macos ]; then
+	# Ad-hoc signature, once the bundle is complete: Apple silicon only runs
+	# signed code. This is not a Developer ID signature, so Gatekeeper still
+	# asks on first launch.
+	codesign --force --sign - "$app/Frameworks/"*.dylib "$app/MacOS/ravage-sv"
+	codesign --force --sign - "$pkg/RAVAGE.app"
+fi
 
 # Licenses. The engine is GPL; the source for this exact build is the
 # release's tag on GitHub.

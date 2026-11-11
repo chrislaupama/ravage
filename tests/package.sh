@@ -109,7 +109,9 @@ if ! $windows; then
 		! grep -q 'RAVAGE selftest: map=duel_graybox' "$log" || break
 		sleep 0.5
 	done
-	kill "$pid" 2>/dev/null || true
+	# KILL, not TERM: the Linux client doesn't exit on TERM, which left CI
+	# waiting on it until the job timed out.
+	kill -9 "$pid" 2>/dev/null || true
 	wait "$pid" 2>/dev/null || true
 	if ! grep -q 'RAVAGE selftest: map=duel_graybox .* errors=0' "$log"; then
 		bad "ravage did not start duel_graybox when launched without commands"

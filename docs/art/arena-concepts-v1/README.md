@@ -10,6 +10,9 @@ Generated 25 October 2026 using the built-in image generation tool. Proposed env
 
 ## Build brief
 
+The Crucible blockout is built: `content/maps/duel_crucible.map`, described in [mapping.md](../../mapping.md#crucible).
+
+
 Start by blocking out the Crucible atrium with plain brushes. Test the bridge sightline, ramp width, overhead clearance and routes around the centre cover with actual movement before adding detail. Relay is a complementary space study, not a validated connected map layout.
 
 Use charcoal structure, midtone combat surfaces, ivory service inserts and restrained red/cyan landmarks. Keep weapon and pickup identity colours from Bone Circuit distinct from environmental decoration. Put small mechanical details in recesses, outside movement paths.

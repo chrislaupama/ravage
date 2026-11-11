@@ -9,7 +9,7 @@ RAVAGE maps are made in [TrenchBroom](https://trenchbroom.github.io/) and compil
 | Path | What it is |
 |---|---|
 | `tools/trenchbroom/RAVAGE/` | TrenchBroom game config (`GameConfig.cfg`), entity definitions (`ravage.fgd`), compile profile and icon |
-| `content/maps/*.map` | Map sources. `duel_graybox.map` is the first graybox Duel arena. |
+| `content/maps/*.map` | Map sources. `duel_graybox.map` is the first graybox Duel arena and `duel_crucible.map` is the Crucible blockout. |
 | `content/textures/ravage.wad` | Graybox textures (WAD3), made by `tools/textures/make_textures.py` |
 | `content/gfx/palette.lmp` | The RAVAGE palette, made by the same script |
 | `game/ssqc/` | Server game code, including a spawn function for every entity in the FGD |
@@ -95,6 +95,24 @@ light -bounce -extra4 <map>.bsp
 
 `tests/map_pipeline.sh` (run by `ctest`) checks that every FGD entity has a spawn function, compiles all maps, checks each is BSP2, then loads each on the dedicated server. A self-test in the game code (`game/ssqc/selftest.qc`) checks that every spawn point has room for a player and a floor under it, and that every pickup rests on a floor and has a model. On Windows CI the same test runs with the Windows builds of the engine and ericw-tools.
 
+## Crucible
+
+`duel_crucible` is the blockout of the Crucible arena from the [concept sheets](art/arena-concepts-v1/README.md), in plain graybox brushes so its layout can be played before any detail goes in. It is point-symmetric, so both halves of a Duel have the same routes.
+
+![Crucible plan: atrium with a bridge between two balconies, ramps, lower and upper exits, and a ring of corridors](images/crucible-plan.png)
+
+- **Atrium** (1024 x 768, 384 high). Balconies along the west and east walls, 144 units up, joined by a bridge across the middle. The rocket launcher is on the bridge and the medium armor is under it, so the two levels fight over the centre.
+- **Ramps** run up to the balconies along the south wall (to the west balcony) and the north wall (to the east one). Two low blocks (48 high) give cover on the floor.
+- **Exits.** Lower doors in the north and south walls lead to the corridors. Upper doors from the balconies, in line with the bridge, lead to raised platforms in the wings holding the railgun and lightning gun, with stairs down to the corridors.
+- **Ring corridors** go all the way round, so every route loops. A chicane halfway along the north and south corridors stops their full length being one sightline. The mega health and heavy armor sit in opposite corners.
+- **Lighting**: white ceiling panels, red lights at the lower doors and cyan at the upper doors, as landmarks.
+
+![Crucible atrium from the floor](images/crucible-atrium.png)
+
+![Crucible from the west balcony](images/crucible-overview.png)
+
+Sizes follow the player box (32 x 32 x 56): doorways are 128 wide, under the bridge has 128 units of headroom, stair steps are 16 high (the step limit is 18), and the ramps rise 144 over 320 units.
+
 ## Benchmark
 
 `tools/bench-map.sh [map] [frames] [width] [height]` loads a map in the client and turns the view a full circle from the first spawn point, three times with each of two measurements, printing the frame rate:
@@ -104,4 +122,4 @@ light -bounce -extra4 <map>.bsp
 
 Compare before and after renderer, map or HUD changes, over several runs.
 
-The Linux CI job runs it on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080 with `timerefresh`, and about 70 fps at 1280x720 with `framebench`, or about 60 with the 16 player models.
+The Linux CI job runs it on `duel_graybox` and `duel_crucible` on every pull request with software rendering (Xvfb and Mesa llvmpipe) at 1280x720 and prints the results in the job log. Software rendering is CPU-bound, so the numbers aren't what a graphics card would give, but they are consistent enough to spot regressions. For reference, `duel_graybox` on a 4-core cloud machine gave about 180 fps at 640x480, 75 at 1280x720 and 36 at 1920x1080 with `timerefresh`, and about 70 fps at 1280x720 with `framebench`, or about 60 with the 16 player models. `duel_crucible` gave about 60 fps at 1280x720 with `framebench`, or about 55 with the player models.

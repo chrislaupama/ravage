@@ -44,7 +44,9 @@ jobs:
       - name: Rendering benchmark (software rendering)
         run: |
           sudo apt-get -qq install --no-install-recommends xvfb libgl1-mesa-dri
-          xvfb-run -a -s "-screen 0 1280x720x24" tools/bench-map.sh duel_graybox 300 1280 720 | tee -a "$GITHUB_STEP_SUMMARY"
+          for map in duel_graybox duel_crucible; do
+            xvfb-run -a -s "-screen 0 1280x720x24" tools/bench-map.sh $map 300 1280 720 | tee -a "$GITHUB_STEP_SUMMARY"
+          done
 
       - uses: actions/upload-artifact@v4
         with:

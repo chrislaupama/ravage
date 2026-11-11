@@ -11,7 +11,8 @@ The near-term goal is a standalone first milestone: a TrenchBroom-built graybox 
 6. **Player and weapon models.** Done. The player is LibreQuake's model and animations (BSD-3) with a RAVAGE skin. The six weapons are LibreQuake's models and animations, recoloured from wood and brass to steel, ceramic and glowing energy parts. Health, armor, ammo and projectiles are LibreQuake's too, recoloured the same way, and so are nearly all the sounds.
 7. **Duel match flow.** Done. Warmup with ready-up, a countdown with an announcer, a match clock and live score on the HUD, overtime when time runs out on a tie, forfeits, and a two-player limit with anyone else joining as a spectator.
 8. **Match recording and statistics.** Done. The server records every match as a demo that plays back with the HUD, and counts each player's accuracy by weapon, damage dealt and taken, frags, deaths and pickups. They are shown on the scoreboard and saved as JSON next to the demo.
-9. **Releases.** In review. Every GitHub release gets standalone Linux, Windows and macOS packages with their license and credit files, built and tested by CI. See [releasing.md](releasing.md).
+9. **Releases.** Done. Every GitHub release gets standalone Linux, Windows and macOS packages with their license and credit files, built and tested by CI. See [releasing.md](releasing.md).
+10. **Crucible arena.** In review. The first arena from the [arena concept sheets](art/arena-concepts-v1/README.md), built as a playable graybox Duel map (`duel_crucible`): a central atrium with a bridge, side ramps, lower and upper exits and centre cover, wrapped in a loop of corridors. Detail and the reusable kit come after it has been played. See [mapping.md](mapping.md#crucible).
 
 Rendering benchmarks run in CI with software rendering (see [mapping.md](mapping.md#benchmark)) to catch regressions.
 
